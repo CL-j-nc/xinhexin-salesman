@@ -143,22 +143,21 @@ const Salesman: React.FC = () => {
     setLoading(true);
     setErrorMsg('');
     try {
-      const response = await fetch('https://xinhexin-api.chinalife-shiexinhexin.workers.dev/api/application/apply', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
-      }); {
-        method: 'POST',
+      const response = await fetch(
+        'https://xinhexin-api.chinalife-shiexinhexin.workers.dev/api/application/apply',
+        {
+          method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
-      });
+          body: JSON.stringify(data)
+        }
+      );
 
       if (!response.ok) {
         throw new Error(`提交失败，状态码：${response.status}`);
       }
 
       const result = await response.json();
-      setInternalPolicyId(result.policyId); // 只保存，不展示
+      setInternalPolicyId(result.applicationNo);
       setStatus('SUBMITTED');
       alert('投保单已提交核保');
     } catch (error) {
@@ -325,7 +324,14 @@ const Salesman: React.FC = () => {
 
           <button
             className="mt-3 px-6 py-2 rounded-lg bg-slate-700 text-white text-sm"
-            onClick={() => alert('查询接口待接入')}
+            onClick={async () => {
+              const res = await fetch(
+                'https://xinhexin-api.chinalife-shiexinhexin.workers.dev/api/application/search?keyword='
+              );
+              const list = await res.json();
+              console.log('投保申请查询结果:', list);
+              alert(`查询到 ${list.length} 条记录（结果已输出到控制台）`);
+            }}
           >
             查询
           </button>
