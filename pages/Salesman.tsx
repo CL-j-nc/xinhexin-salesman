@@ -203,15 +203,18 @@ const Salesman: React.FC = () => {
         {/* Header */}
         <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-8 border-b border-slate-200">
           <div className="flex items-center gap-3">
-            <div className="w-7 h-7 relative">
-              <svg viewBox="0 0 28 28" className="w-full h-full">
-                <path d="M14 3 L25 9 L25 19 L14 25 L3 19 L3 9 Z" fill="none" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" />
-                <circle cx="14" cy="14" r="5" fill="#10b981" />
-              </svg>
-            </div>
-            <div>
-              <h1 className="text-2xl font-black text-slate-800 tracking-tight">上海保交所 - 国寿财险核心承保系统</h1>
-              <p className="text-xs text-slate-500 font-medium mt-0.5">中国人寿车险 - 投保信息采集</p>
+            <img
+              src="/logo-a.png"
+              alt="系统 Logo"
+              className="h-10 w-auto object-contain"
+            />
+            <div className="flex flex-col">
+              <h1 className="text-xl font-black text-slate-800 tracking-tight">
+                新核心承保系统
+              </h1>
+              <p className="text-xs text-slate-500 mt-0.5">
+                上海保交所 · 车险好投保平台支持
+              </p>
             </div>
           </div>
 
@@ -279,7 +282,7 @@ const Salesman: React.FC = () => {
                 <Input label="整备质量 (kg)" value={data.vehicle.curbWeight} onChange={v => handleInputChange('vehicle', 'curbWeight', v)} disabled={isSubmitted} />
                 <Input label="核定载质量 (kg)" value={data.vehicle.approvedLoad} onChange={v => handleInputChange('vehicle', 'approvedLoad', v)} disabled={isSubmitted} />
                 <Input label="核定载客人数 (人)" value={data.vehicle.approvedPassengers} onChange={v => handleInputChange('vehicle', 'approvedPassengers', v)} disabled={isSubmitted} />
-                <Input label="使用性质" value={data.vehicle.useNature} onChange={v => handleInputChange('vehicle', 'useNature', v)} disabled={isSubmitted} />
+                <Input label="使用性质" value={data.vehicle.useNature || ''} onChange={v => handleInputChange('vehicle', 'useNature', v)} disabled={isSubmitted} />
                 <div className="md:col-span-2">
                   <UploadZone
                     value={data.vehicle.licenseImage || ''}
