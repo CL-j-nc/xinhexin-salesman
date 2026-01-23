@@ -45,8 +45,32 @@ const steps = [
 
 const Salesman: React.FC = () => {
   const [data, setData] = useState<InsuranceData>({
-    proposer: { name: '', idType: '居民身份证', idCard: '', mobile: '', address: '', idImage: '', principalName: '', principalIdCard: '', principalAddress: '', principalIdImage: '' },
-    insured: { name: '', idType: '居民身份证', idCard: '', mobile: '', address: '', idImage: '', principalName: '', principalIdCard: '', principalAddress: '', principalIdImage: '' },
+    proposer: {
+      name: '',
+      idType: '居民身份证',
+      idCard: '',
+      mobile: '',
+      address: '',
+      idImage: '',
+      principalName: '',
+      principalIdCard: '',
+      principalAddress: '',
+      principalIdImage: '',
+      verifyCode: '',
+      verified: false
+    },
+    insured: {
+      name: '',
+      idType: '居民身份证',
+      idCard: '',
+      mobile: '',
+      address: '',
+      idImage: '',
+      principalName: '',
+      principalIdCard: '',
+      principalAddress: '',
+      principalIdImage: ''
+    },
     vehicle: {
       plate: '',
       owner: '',
@@ -119,9 +143,13 @@ const Salesman: React.FC = () => {
     setLoading(true);
     setErrorMsg('');
     try {
-      const response = await fetch('/api/policies', {
+      const response = await fetch('https://xinhexin-api.chinalife-shiexinhexin.workers.dev/api/application/apply', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      }); {
+        method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
       });
 
@@ -153,6 +181,26 @@ const Salesman: React.FC = () => {
           <Select label="证件类型" value={person.idType} options={ID_TYPES} onChange={v => handleInputChange(type, 'idType', v)} disabled={isSubmitted} />
           <Input label="证件号码" value={person.idCard} onChange={v => handleInputChange(type, 'idCard', v)} disabled={isSubmitted} />
           <Input label="联系电话" value={person.mobile} onChange={v => handleInputChange(type, 'mobile', v)} disabled={isSubmitted} />
+          {/* 手机验证码和验证状态，仅投保人展示 */}
+          {type === 'proposer' && (
+            <>
+              <Input
+                label="手机验证码"
+                value={person.verifyCode || ''}
+                onChange={v => handleInputChange(type, 'verifyCode', v)}
+                disabled={isSubmitted}
+              />
+              <div className="flex items-center text-sm text-slate-500 mt-2">
+                <span>
+                  {person.verified ? (
+                    <span className="text-emerald-600">手机号已验证</span>
+                  ) : (
+                    <span className="text-rose-500">手机号未验证</span>
+                  )}
+                </span>
+              </div>
+            </>
+          )}
           <div className="md:col-span-2">
             <Input label="详细地址" value={person.address} onChange={v => handleInputChange(type, 'address', v)} disabled={isSubmitted} />
           </div>
@@ -264,7 +312,24 @@ const Salesman: React.FC = () => {
             })}
           </div>
         </div>
+        {/* 投保申请记录查询 */}
+        <div className="mb-6 bg-white border border-slate-200 rounded-xl p-4">
+          <h3 className="text-sm font-bold text-slate-700 mb-3">投保申请记录查询</h3>
 
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+            <input className="input-base" placeholder="投保人名称" />
+            <input className="input-base" placeholder="被保险人名称" />
+            <input className="input-base" placeholder="车牌号" />
+            <input className="input-base" placeholder="VIN / 发动机号" />
+          </div>
+
+          <button
+            className="mt-3 px-6 py-2 rounded-lg bg-slate-700 text-white text-sm"
+            onClick={() => alert('查询接口待接入')}
+          >
+            查询
+          </button>
+        </div>
         {/* Main Card */}
         <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 md:p-8 min-h-[500px]">
           {activeStep === 0 && renderPersonSection('proposer', '投保人')}
