@@ -1,56 +1,95 @@
-/**
- * ================================
- *  核心数据结构定义（Salesman）
- * ================================
- */
+import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/router';
 
-export type CoverageItem = {
-  type: string;
-  level?: string;
-  addon?: boolean;        // 是否附加险
-  selectable?: boolean;   // 是否可选（灰选用）
-};
-
-export interface PersonInfo {
-  name: string;
-  idType: string;
-  idCard: string;
-  mobile: string;
-  address: string;
-  idImage: string;
-
-  principalName?: string;
-  principalIdCard?: string;
-  principalAddress?: string;
-  principalIdImage?: string;
-
-  verifyCode?: string;
-  verified?: boolean;
+interface ApplicationItem {
+  applicationNo: string;
+  status: string;
+  // other fields...
 }
 
-export type VehicleInfo = {
-  plate: string;
-  vin: string;
-  engineNo: string;
-  brand: string;
-  registerDate: string;
+type UnderwritingCategory = 'NORMAL' | 'SPECIAL';
 
-  owner: string;
-  vehicleType?: string;
-  useNature?: string;
+const Underwriting = () => {
+  const router = useRouter();
+  const { applicationNo } = router.query;
 
-  curbWeight: string;
-  approvedLoad: string;
-  approvedPassengers: string;
+  const [currentApp, setCurrentApp] = useState<ApplicationItem | null>(null);
+  const [statusMsg, setStatusMsg] = useState<string>('');
+  const [underwritingCategory, setUnderwritingCategory] =
+    useState<UnderwritingCategory>('NORMAL');
 
-  licenseImage?: string;
-  energyType: 'FUEL' | 'NEV';
+  useEffect(() => {
+    if (applicationNo) {
+      // fetch application data
+    }
+  }, [applicationNo]);
+
+  const handleApprove = async () => {
+    if (!currentApp) return;
+    const coverages = []; // get coverages
+    const premiumSummary = {}; // get premium summary
+
+    const res = await fetch('/api/approve', {
+      method: 'POST',
+      body: JSON.stringify({
+        applicationNo: currentApp.applicationNo,
+        coverages,
+        premiumSummary,
+        underwritingCategory
+      }),
+    });
+
+    if (res.ok) {
+      setStatusMsg('核保通过');
+    } else {
+      setStatusMsg('核保失败');
+    }
+  };
+
+  return (
+    <div>
+    { currentApp && (
+      <div className= "bg-slate-50 border border-slate-200 rounded-lg p-4 text-sm space-y-1" >
+      {/* application readonly info */ }
+    </div>
+      )}
+
+{/* 承保车辆类别裁定 */ }
+{
+  currentApp && (
+    <div className="border border-slate-200 rounded-lg p-4 space-y-2" >
+      <div className="text-sm font-semibold" > 承保车辆类别（核保裁定）</div>
+        < div className = "flex gap-4 text-sm" >
+          <label className="flex items-center gap-2" >
+            <input
+                type="radio"
+  value = "NORMAL"
+  checked = { underwritingCategory === 'NORMAL'
+}
+onChange = {() => setUnderwritingCategory('NORMAL')}
+              />
+机动车
+  </label>
+  < label className = "flex items-center gap-2" >
+    <input
+                type="radio"
+value = "SPECIAL"
+checked = { underwritingCategory === 'SPECIAL'}
+onChange = {() => setUnderwritingCategory('SPECIAL')}
+              />
+特种车
+  </label>
+  </div>
+  < div className = "text-xs text-slate-500" >
+    核保人员根据行驶证、使用性质、车辆照片等信息裁定最终承保类别
+      </div>
+      </div>
+      )}
+
+<button onClick={ handleApprove }> 核保通过 </button>
+  < div > { statusMsg } </div>
+  </div>
+  );
 };
 
-export type InsuranceData = {
-  insuranceOwner?: PersonInfo;
-  proposer: PersonInfo;
-  insured: PersonInfo;
-  vehicle: VehicleInfo;
-  coverages: CoverageItem[];
-};
+export default Underwriting;
