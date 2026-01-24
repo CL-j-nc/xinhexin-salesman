@@ -6,7 +6,9 @@
 
 export type CoverageItem = {
   type: string;
-  level: string;
+  level?: string;
+  addon?: boolean;        // 是否附加险
+  selectable?: boolean;   // 是否可选（灰选用）
 };
 
 export interface PersonInfo {
@@ -42,6 +44,7 @@ export type VehicleInfo = {
   approvedPassengers: string;
 
   licenseImage?: string;
+  energyType: 'FUEL' | 'NEV';
 };
 
 export type InsuranceData = {

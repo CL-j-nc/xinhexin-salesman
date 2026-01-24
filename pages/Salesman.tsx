@@ -1,6 +1,8 @@
 // Salesman.tsx
 import React, { useState, useRef } from 'react';
 import { InsuranceData } from '../utils/codec';
+import { MAIN_COVERAGES, NEV_ADDONS, CoverageGroup } from '../config/coverages';
+
 
 const ID_TYPES = [
   { value: '居民身份证', label: '居民身份证' },
@@ -9,32 +11,14 @@ const ID_TYPES = [
   { value: '港澳台通行证', label: '港澳台通行证' },
 ];
 
-const COVERAGE_OPTIONS = [
-  {
-    id: 'third_party',
-    name: '机动车第三者责任保险',
-    levels: ['100万', '150万', '200万', '300万', '500万'],
-    default: true,
-  },
-  {
-    id: 'damage',
-    name: '机动车损失保险',
-    levels: ['按新车购置价', '按折旧价值'],
-    default: true,
-  },
-  {
-    id: 'driver',
-    name: '机动车车上人员责任保险-驾驶人',
-    levels: ['1万', '2万', '3万', '5万', '10万', '15万', '20万'],
-    default: false,
-  },
-  {
-    id: 'passenger',
-    name: '机动车车上人员责任保险-乘客',
-    levels: ['1万', '2万', '3万', '5万', '10万', '15万', '20万'],
-    default: false,
-  },
+const VEHICLE_USE_NATURE_OPTIONS = [
+  { value: '出租营运客车', label: '出租营运客车' },
+  { value: '预约出租客运', label: '预约出租客运' },
+  { value: '租赁营运客车', label: '租赁营运客车' },
+  { value: '营业货车', label: '营业货车' },
+  { value: '非营业货车', label: '非营业货车' }
 ];
+
 
 const steps = [
   { id: 'proposer', title: '1. 投保人' },
@@ -83,7 +67,8 @@ const Salesman: React.FC = () => {
       curbWeight: '',
       approvedLoad: '',
       approvedPassengers: '',
-      licenseImage: ''
+      licenseImage: '',
+      energyType: 'FUEL'
     },
     coverages: [
       { type: 'third_party', level: '300万' },
@@ -93,11 +78,13 @@ const Salesman: React.FC = () => {
 
   const [activeStep, setActiveStep] = useState(0);
   const [expandedCoverages, setExpandedCoverages] = useState<string[]>(['third_party', 'damage']);
+  const [nevAddonSelected, setNevAddonSelected] = useState<string[]>([]);
   const [internalPolicyId, setInternalPolicyId] = useState<string>(''); // 仅内部使用，不展示
   const [status, setStatus] = useState<'DRAFT' | 'SUBMITTED' | 'APPROVED' | 'REJECTED'>('DRAFT');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string>('');
   const [queryList, setQueryList] = useState<any[]>([]);
+  const coverageOptions = MAIN_COVERAGES[data.vehicle.energyType];
 
   const isSubmitted = status !== 'DRAFT';
 
@@ -127,6 +114,32 @@ const Salesman: React.FC = () => {
     );
   };
 
+  // 新能源附加险工具函数
+  const hasDamageCoverage = data.coverages.some(c => c.type === 'damage');
+
+  const syncNevAddons = (selected: string[]) => {
+    setData(prev => {
+      // 移除所有旧的新能源附加险
+      const filtered = prev.coverages.filter(
+        c => !NEV_ADDONS.some(a => a.id === c.type)
+      );
+
+      // 重新写入附加险
+      const addons = NEV_ADDONS
+        .filter(a => !a.selectable || selected.includes(a.id))
+        .map(a => ({
+          type: a.id,
+          addon: true,
+          selectable: a.selectable
+        }));
+
+      return {
+        ...prev,
+        coverages: [...filtered, ...addons]
+      };
+    });
+  };
+
   const updateCoverageLevel = (type: string, level: string) => {
     setData(prev => {
       const next = [...prev.coverages];
@@ -136,7 +149,16 @@ const Salesman: React.FC = () => {
       } else {
         next.push({ type, level });
       }
-      return { ...prev, coverages: next };
+      const nextState = { ...prev, coverages: next };
+
+      // 新能源 + 车损险 → 同步附加险
+      if (data.vehicle.energyType === 'NEV') {
+        if (type === 'damage') {
+          syncNevAddons(nevAddonSelected);
+        }
+      }
+
+      return nextState;
     });
   };
 
@@ -245,7 +267,12 @@ const Salesman: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50/60">
+    <div
+      className={`min-h-screen ${data.vehicle.energyType === 'NEV'
+        ? 'bg-gradient-to-b from-emerald-100 via-emerald-50 to-white'
+        : 'bg-slate-50/60'
+        }`}
+    >
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
 
         {/* Header */}
@@ -319,6 +346,29 @@ const Salesman: React.FC = () => {
             <div className="space-y-6 animate-fadeIn">
               <h2 className="text-xl font-bold text-slate-800">车辆信息采集</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <Select
+                  label="车辆类型"
+                  value={data.vehicle.energyType}
+                  options={[
+                    { value: 'FUEL', label: '燃油车' },
+                    { value: 'NEV', label: '新能源车' }
+                  ]}
+                  onChange={v => {
+                    handleInputChange('vehicle', 'energyType', v);
+
+                    // 切换车型时，清空新能源附加险
+                    if (v !== 'NEV') {
+                      setNevAddonSelected([]);
+                      setData(prev => ({
+                        ...prev,
+                        coverages: prev.coverages.filter(
+                          c => !NEV_ADDONS.some(a => a.id === c.type)
+                        )
+                      }));
+                    }
+                  }}
+                  disabled={isSubmitted}
+                />
                 <Input label="号牌号码" value={data.vehicle.plate} onChange={v => handleInputChange('vehicle', 'plate', v)} disabled={isSubmitted} />
                 <Input label="车辆所有人" value={data.vehicle.owner || ''} onChange={v => handleInputChange('vehicle', 'owner', v)} disabled={isSubmitted} />
                 <Input label="品牌型号" value={data.vehicle.brand} onChange={v => handleInputChange('vehicle', 'brand', v)} disabled={isSubmitted} />
@@ -328,7 +378,25 @@ const Salesman: React.FC = () => {
                 <Input label="整备质量 (kg)" value={data.vehicle.curbWeight} onChange={v => handleInputChange('vehicle', 'curbWeight', v)} disabled={isSubmitted} />
                 <Input label="核定载质量 (kg)" value={data.vehicle.approvedLoad} onChange={v => handleInputChange('vehicle', 'approvedLoad', v)} disabled={isSubmitted} />
                 <Input label="核定载客人数 (人)" value={data.vehicle.approvedPassengers} onChange={v => handleInputChange('vehicle', 'approvedPassengers', v)} disabled={isSubmitted} />
-                <Input label="使用性质" value={data.vehicle.useNature || ''} onChange={v => handleInputChange('vehicle', 'useNature', v)} disabled={isSubmitted} />
+                <div className="relative">
+                  <Select
+                    label="车辆使用性质"
+                    value={data.vehicle.useNature || ''}
+                    options={VEHICLE_USE_NATURE_OPTIONS}
+                    onChange={v => handleInputChange('vehicle', 'useNature', v)}
+                    disabled={isSubmitted}
+                    required
+                  />
+                  {/* 问号提示 */}
+                  <div className="absolute right-2 top-8 group">
+                    <div className="w-5 h-5 rounded-full bg-slate-200 text-slate-600 text-xs flex items-center justify-center cursor-pointer">
+                      ?
+                    </div>
+                    <div className="absolute right-0 mt-2 w-72 bg-black text-white text-xs rounded-md p-3 opacity-0 group-hover:opacity-100 transition pointer-events-none z-50">
+                      仅支持出租（含预约出租客运）、营业客车、租赁营运客车、营业货车和非营业货车进行投保登记。
+                    </div>
+                  </div>
+                </div>
                 <div className="md:col-span-2">
                   <UploadZone
                     value={data.vehicle.licenseImage || ''}
@@ -370,7 +438,7 @@ const Salesman: React.FC = () => {
               <h2 className="text-xl font-bold text-slate-800">险种初步选择</h2>
               <p className="text-sm text-slate-500">核心险种默认展开，可选险种点击标题展开添加。</p>
               <div className="space-y-3">
-                {COVERAGE_OPTIONS.map(opt => {
+                {coverageOptions.map(opt => {
                   const cov = data.coverages.find(c => c.type === opt.id) || { type: opt.id, level: opt.levels[0] };
                   const expanded = expandedCoverages.includes(opt.id);
                   return (
@@ -397,6 +465,39 @@ const Salesman: React.FC = () => {
                           >
                             {opt.levels.map(lv => <option key={lv} value={lv}>{lv}</option>)}
                           </select>
+                        )}
+                        {/* 新能源附加险区域 */}
+                        {data.vehicle.energyType === 'NEV' && opt.group === CoverageGroup.DAMAGE && (
+                          <div className="mt-3 space-y-2 pl-4 border-l border-emerald-200">
+                            {NEV_ADDONS.map(addon => (
+                              <label
+                                key={addon.id}
+                                className={`flex items-center gap-2 text-sm ${addon.selectable ? 'text-slate-700' : 'text-slate-400'
+                                  }`}
+                              >
+                                <input
+                                  type="checkbox"
+                                  disabled={!addon.selectable}
+                                  checked={
+                                    addon.selectable
+                                      ? nevAddonSelected.includes(addon.id)
+                                      : true
+                                  }
+                                  onChange={e => {
+                                    if (!addon.selectable) return;
+
+                                    const next = e.target.checked
+                                      ? [...nevAddonSelected, addon.id]
+                                      : nevAddonSelected.filter(x => x !== addon.id);
+
+                                    setNevAddonSelected(next);
+                                    syncNevAddons(next);
+                                  }}
+                                />
+                                {addon.name}
+                              </label>
+                            ))}
+                          </div>
                         )}
                       </div>
                     </div>
