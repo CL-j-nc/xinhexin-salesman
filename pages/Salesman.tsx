@@ -1,7 +1,7 @@
 // Salesman.tsx
 import React, { useState, useRef } from 'react';
-import { InsuranceData } from '../utils/codec';
-import { MAIN_COVERAGES, NEV_ADDONS, CoverageGroup } from '../config/coverages';
+import { InsuranceData } from '../utils/codec.js';
+import { MAIN_COVERAGES, NEV_ADDONS, CoverageGroup } from '../config/coverages.js';
 
 
 const ID_TYPES = [
@@ -71,7 +71,7 @@ const Salesman: React.FC = () => {
       energyType: 'FUEL'
     },
     coverages: [
-      { type: 'third_party', level: '300万' },
+      { type: 'third_party', level: '100万' },
       { type: 'damage', level: '按新车购置价' }
     ]
   });
@@ -84,7 +84,7 @@ const Salesman: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string>('');
   const [queryList, setQueryList] = useState<any[]>([]);
-  const coverageOptions = MAIN_COVERAGES[data.vehicle.energyType];
+  const coverageOptions = MAIN_COVERAGES[data.vehicle.energyType as 'FUEL' | 'NEV'];
 
   const isSubmitted = status !== 'DRAFT';
 
@@ -115,10 +115,10 @@ const Salesman: React.FC = () => {
   };
 
   // 新能源附加险工具函数
-  const hasDamageCoverage = data.coverages.some(c => c.type === 'damage');
+  const hasDamageCoverage = data.coverages.some((c: any) => c.type === 'damage');
 
   const syncNevAddons = (selected: string[]) => {
-    setData(prev => {
+    setData((prev: InsuranceData) => {
       // 移除所有旧的新能源附加险
       const filtered = prev.coverages.filter(
         c => !NEV_ADDONS.some(a => a.id === c.type)
@@ -126,8 +126,8 @@ const Salesman: React.FC = () => {
 
       // 重新写入附加险
       const addons = NEV_ADDONS
-        .filter(a => !a.selectable || selected.includes(a.id))
-        .map(a => ({
+        .filter((a: any) => !a.selectable || selected.includes(a.id))
+        .map((a: any) => ({
           type: a.id,
           addon: true,
           selectable: a.selectable
@@ -141,7 +141,7 @@ const Salesman: React.FC = () => {
   };
 
   const updateCoverageLevel = (type: string, level: string) => {
-    setData(prev => {
+    setData((prev: InsuranceData) => {
       const next = [...prev.coverages];
       const idx = next.findIndex(c => c.type === type);
       if (idx >= 0) {
@@ -375,9 +375,9 @@ const Salesman: React.FC = () => {
                 <Input label="车架号 (VIN)码" value={data.vehicle.vin} onChange={v => handleInputChange('vehicle', 'vin', v)} disabled={isSubmitted} />
                 <Input label="发动机号" value={data.vehicle.engineNo} onChange={v => handleInputChange('vehicle', 'engineNo', v)} disabled={isSubmitted} />
                 <Input label="初次登记日期" value={data.vehicle.registerDate} onChange={v => handleInputChange('vehicle', 'registerDate', v)} disabled={isSubmitted} />
-                <Input label="整备质量 (kg)" value={data.vehicle.curbWeight} onChange={v => handleInputChange('vehicle', 'curbWeight', v)} disabled={isSubmitted} />
-                <Input label="核定载质量 (kg)" value={data.vehicle.approvedLoad} onChange={v => handleInputChange('vehicle', 'approvedLoad', v)} disabled={isSubmitted} />
-                <Input label="核定载客人数 (人)" value={data.vehicle.approvedPassengers} onChange={v => handleInputChange('vehicle', 'approvedPassengers', v)} disabled={isSubmitted} />
+                <Input label="整备质量 (kg)" value={data.vehicle.curbWeight || ''} onChange={v => handleInputChange('vehicle', 'curbWeight', v)} disabled={isSubmitted} />
+                <Input label="核定载质量 (kg)" value={data.vehicle.approvedLoad || ''} onChange={v => handleInputChange('vehicle', 'approvedLoad', v)} disabled={isSubmitted} />
+                <Input label="核定载客人数 (人)" value={data.vehicle.approvedPassengers || ''} onChange={v => handleInputChange('vehicle', 'approvedPassengers', v)} disabled={isSubmitted} />
                 <div className="relative">
                   <Select
                     label="车辆使用性质"
@@ -438,8 +438,8 @@ const Salesman: React.FC = () => {
               <h2 className="text-xl font-bold text-slate-800">险种初步选择</h2>
               <p className="text-sm text-slate-500">核心险种默认展开，可选险种点击标题展开添加。</p>
               <div className="space-y-3">
-                {coverageOptions.map(opt => {
-                  const cov = data.coverages.find(c => c.type === opt.id) || { type: opt.id, level: opt.levels[0] };
+                {coverageOptions.map((opt: any) => {
+                  const cov = data.coverages.find((c: any) => c.type === opt.id) || { type: opt.id, level: opt.levels[0] };
                   const expanded = expandedCoverages.includes(opt.id);
                   return (
                     <div key={opt.id} className="bg-slate-50/60 rounded-xl overflow-hidden border border-slate-100">
@@ -463,7 +463,7 @@ const Salesman: React.FC = () => {
                             onChange={e => updateCoverageLevel(opt.id, e.target.value)}
                             className="w-full bg-white border border-slate-200 rounded-xl p-3 text-slate-700 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-200 outline-none transition"
                           >
-                            {opt.levels.map(lv => <option key={lv} value={lv}>{lv}</option>)}
+                            {opt.levels.map((lv: string) => <option key={lv} value={lv}>{lv}</option>)}
                           </select>
                         )}
                         {/* 新能源附加险区域 */}
