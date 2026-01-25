@@ -12,4 +12,4 @@ root.render(
   <React.StrictMode>
     <App />
   </React.StrictMode>
-);
+); return jsonResponse({ success: false, error: err.message }, 400);
