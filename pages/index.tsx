@@ -1,3 +1,5 @@
+// src/index.tsx 或 Menu.tsx（替换原文件）
+
 import React from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -10,17 +12,17 @@ const Menu: React.FC = () => {
         <h1 className="text-xl font-bold text-center">Salesman 工作台</h1>
 
         <button
-          className="w-full py-4 rounded-xl bg-emerald-600 text-white font-medium"
+          className="w-full py-4 rounded-xl bg-emerald-600 text-white font-medium hover:bg-emerald-700"
           onClick={() => nav("/salesman/apply")}
         >
           1️⃣ 投保信息录入
         </button>
 
         <button
-          className="w-full py-4 rounded-xl bg-slate-700 text-white font-medium"
+          className="w-full py-4 rounded-xl bg-slate-700 text-white font-medium hover:bg-slate-800"
           onClick={() => nav("/salesman/query")}
         >
-          2️⃣ 投保信息查询
+          2️⃣ 历史投保记录查询
         </button>
       </div>
     </div>

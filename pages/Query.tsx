@@ -1,6 +1,6 @@
-// Query.tsx （完整代码，已优化查询逻辑 + 显示核保状态）
+// src/pages/Query.tsx（替换原文件）
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 
 const API_BASE = "https://xinhexin-api.chinalife-shiexinhexin.workers.dev";
 
@@ -22,25 +22,40 @@ const Query: React.FC = () => {
   });
   const [list, setList] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);
+
+  // 页面加载时自动显示最近 20 条记录（历史信息载入）
+  useEffect(() => {
+    const loadRecent = async () => {
+      setLoading(true);
+      try {
+        const res = await fetch(`${API_BASE}/api/application/search?keyword=`);
+        if (res.ok) {
+          const data = await res.json();
+          setList(Array.isArray(data) ? data : []);
+        }
+      } catch (err) {
+        console.error("自动加载失败");
+      } finally {
+        setLoading(false);
+        setHasSearched(true);
+      }
+    };
+    loadRecent();
+  }, []);
 
   const search = async () => {
-    if (!form.proposer && !form.insured && !form.plate && !form.vin) {
-      alert("请至少填写一项查询条件");
-      return;
-    }
+    const keyword = [form.proposer, form.insured, form.plate, form.vin]
+      .filter(Boolean)
+      .join(" ") || "";  // 空关键词时仍查询全部（最近记录）
 
     setLoading(true);
+    setHasSearched(true);
     try {
-      const keyword = [form.proposer, form.insured, form.plate, form.vin]
-        .filter(Boolean)
-        .join(" ");
-
       const res = await fetch(
         `${API_BASE}/api/application/search?keyword=${encodeURIComponent(keyword)}`
       );
-
       if (!res.ok) throw new Error(`请求失败: ${res.status}`);
-
       const data = await res.json();
       setList(Array.isArray(data) ? data : []);
     } catch (err: any) {
@@ -94,6 +109,8 @@ const Query: React.FC = () => {
         </div>
       </div>
 
+      {loading && <div className="text-center text-slate-500">加载中...</div>}
+
       {list.length > 0 && (
         <div className="bg-white rounded-xl shadow-sm overflow-hidden">
           <table className="w-full text-sm">
@@ -107,7 +124,7 @@ const Query: React.FC = () => {
             </thead>
             <tbody>
               {list.map((r) => (
-                <tr key={r.applicationNo} className="border-t">
+                <tr key={r.applicationNo} className="border-t hover:bg-slate-50">
                   <td className="px-6 py-4 font-medium">{r.applicationNo}</td>
                   <td className="px-6 py-4">
                     <span
@@ -130,9 +147,9 @@ const Query: React.FC = () => {
         </div>
       )}
 
-      {list.length === 0 && !loading && (
+      {!loading && hasSearched && list.length === 0 && (
         <div className="text-center text-slate-500 py-12">
-          暂无符合条件的记录，请检查查询条件后重试
+          暂无符合条件的记录（可尝试清空条件重新查询）
         </div>
       )}
     </div>

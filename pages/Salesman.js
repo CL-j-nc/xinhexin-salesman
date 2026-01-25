@@ -140,26 +140,79 @@ const Salesman = () => {
             return nextState;
         });
     };
+    const validateFormData = () => {
+        // 投保人信息校验
+        if (!data.proposer.name)
+            return '请填写投保人姓名';
+        if (!data.proposer.idCard)
+            return '请填写投保人证件号码';
+        if (!data.proposer.mobile)
+            return '请填写投保人联系电话';
+        if (!data.proposer.address)
+            return '请填写投保人详细地址';
+        // 被保险人信息校验
+        if (!data.insured.name)
+            return '请填写被保险人姓名';
+        if (!data.insured.idCard)
+            return '请填写被保险人证件号码';
+        if (!data.insured.mobile)
+            return '请填写被保险人联系电话';
+        // 投保车辆校验
+        if (!data.vehicle.plate)
+            return '请填写车牌号';
+        if (!data.vehicle.vin)
+            return '请填写VIN号';
+        if (!data.vehicle.engineNo)
+            return '请填写发动机号';
+        if (!data.vehicle.brand)
+            return '请选择车辆品牌';
+        if (!data.vehicle.registerDate)
+            return '请填写注册日期';
+        if (!data.vehicle.useNature)
+            return '请选择车辆使用性质';
+        // 险种校验
+        if (!data.coverages || data.coverages.length === 0)
+            return '请至少选择一个险种';
+        return null;
+    };
     const handleSubmit = async () => {
+        const validationError = validateFormData();
+        if (validationError) {
+            setErrorMsg(validationError);
+            return;
+        }
         setLoading(true);
         setErrorMsg('');
         try {
+            console.log('开始提交投保单，数据:', data);
             const response = await fetch('https://xinhexin-api.chinalife-shiexinhexin.workers.dev/api/application/apply', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                credentials: 'omit',
                 body: JSON.stringify(data)
             });
-            if (!response.ok) {
-                throw new Error(`提交失败，状态码：${response.status}`);
-            }
+            console.log('API 响应状态:', response.status);
+            console.log('API 响应头:', {
+                'content-type': response.headers.get('content-type'),
+                'access-control-allow-origin': response.headers.get('access-control-allow-origin')
+            });
             const result = await response.json();
+            console.log('API 返回数据:', result);
+            if (!response.ok) {
+                throw new Error(result.error || `提交失败，状态码：${response.status}`);
+            }
             setInternalPolicyId(result.applicationNo);
             setStatus('SUBMITTED');
             alert('投保单已提交核保');
         }
         catch (error) {
-            console.error('提交失败：', error);
-            setErrorMsg('提交失败，请检查网络或必填项是否完整');
+            const errorMsg = error instanceof Error ? error.message : String(error);
+            console.error('提交失败：', errorMsg);
+            console.error('完整错误信息：', error);
+            setErrorMsg(`提交失败: ${errorMsg}`);
         }
         finally {
             setLoading(false);
@@ -175,7 +228,7 @@ const Salesman = () => {
             : 'bg-slate-50/60'}`, children: _jsxs("div", { className: "max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12", children: [_jsxs("header", { className: "flex flex-col sm:flex-row sm:items-center sm:justify-between pb-8 border-b border-slate-200", children: [_jsxs("div", { className: "flex items-center gap-3", children: [_jsx("img", { src: "/logo-a.png", alt: "\u7CFB\u7EDF Logo", className: "h-10 w-auto object-contain" }), _jsxs("div", { className: "flex flex-col", children: [_jsx("h1", { className: "text-xl font-black text-slate-800 tracking-tight", children: "\u65B0\u6838\u5FC3\u627F\u4FDD\u7CFB\u7EDF" }), _jsx("p", { className: "text-xs text-slate-500 mt-0.5", children: "\u4E0A\u6D77\u4FDD\u4EA4\u6240 \u00B7 \u8F66\u9669\u597D\u6295\u4FDD\u5E73\u53F0\u652F\u6301" })] })] }), !isSubmitted && (_jsx("button", { onClick: handleSubmit, disabled: loading || isSubmitted, className: `
                 btn-primary px-10 py-3 mt-4 sm:mt-0
                 ${loading ? 'btn-loading' : ''}
-              `, children: loading ? '提交中…' : '提交核保' }))] }), _jsxs("div", { className: "relative py-8", children: [_jsx("div", { className: "absolute top-1/2 left-0 right-0 h-0.5 bg-slate-200 -translate-y-1/2" }), _jsx("div", { className: "relative flex justify-between", children: steps.map((step, idx) => {
+              `, children: loading ? '提交中…' : '提交核保' }))] }), errorMsg && (_jsxs("div", { className: "mb-6 p-4 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-sm font-medium animate-fadeIn", children: ["\u26A0\uFE0F ", errorMsg] })), _jsxs("div", { className: "relative py-8", children: [_jsx("div", { className: "absolute top-1/2 left-0 right-0 h-0.5 bg-slate-200 -translate-y-1/2" }), _jsx("div", { className: "relative flex justify-between", children: steps.map((step, idx) => {
                                 const isActive = activeStep === idx;
                                 const isDone = activeStep > idx;
                                 return (_jsxs("button", { onClick: () => !isSubmitted && setActiveStep(idx), className: `
