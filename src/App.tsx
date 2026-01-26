@@ -1,9 +1,9 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 
-import Menu from './pages/index.tsx';
-import Salesman from './pages/Salesman.tsx';
-import Query from './pages/Query.tsx';
+import Menu from './pages/index';
+import Salesman from './pages/Salesman';
+import Query from './pages/Query';
 
 const App: React.FC = () => {
   return (

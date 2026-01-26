@@ -1,11 +1,9 @@
-import React from 'react';
+import React from 'react'
+import ReactDOM from 'react-dom/client'
+import App from './App'
 
-const Menu: React.FC = () => {
-    return (
-        <div>
-            {/* 页面内容 */}
-        </div>
-    );
-};
-
-export default Menu;
+ReactDOM.createRoot(document.getElementById('root')!).render(
+    <React.StrictMode>
+        <App />
+    </React.StrictMode>
+)
