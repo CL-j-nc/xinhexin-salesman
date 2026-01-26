@@ -175,8 +175,8 @@ const Salesman: React.FC = () => {
     } catch { }
   };
 
-  const uploadFile = async (file: File | string | null): Promise<string | null> => {
-    if (!file) return null;
+  const uploadFile = async (file: File | string | null): Promise<string> => {
+    if (!file) return "";
     if (typeof file === "string") return file;
     const formData = new FormData();
     formData.append("file", file);
