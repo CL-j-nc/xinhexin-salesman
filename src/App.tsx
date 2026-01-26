@@ -1,10 +1,9 @@
-// src/App.tsx
-import React from 'react'
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 
-import Menu from './pages/index.tsx'         // ← 加 .tsx
-import Salesman from './pages/Salesman.tsx'   // ← 加 .tsx
-import Query from './pages/Query.tsx'         // ← 加 .tsx
+import Menu from './pages/index.tsx';
+import Salesman from './pages/Salesman.tsx';
+import Query from './pages/Query.tsx';
 
 const App: React.FC = () => {
   return (
@@ -18,7 +17,7 @@ const App: React.FC = () => {
         {/* 404 部分不变 */}
       </Routes>
     </Router>
-  )
-}
+  );
+};
 
-export default App
+export default App;
