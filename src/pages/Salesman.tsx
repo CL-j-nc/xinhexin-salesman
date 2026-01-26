@@ -1,7 +1,7 @@
 // Salesman.tsx
 import React, { useState, useRef } from 'react';
-import { InsuranceData } from '../utils/codec.js';
-import { MAIN_COVERAGES, NEV_ADDONS, CoverageGroup } from '../config/coverages.js';
+import { InsuranceData } from '../../utils/codec.js';
+import { MAIN_COVERAGES, NEV_ADDONS, CoverageGroup } from '../../config/coverages.js';
 
 
 const ID_TYPES = [

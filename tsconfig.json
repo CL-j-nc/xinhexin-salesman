@@ -8,12 +8,15 @@
       "DOM.Iterable"
     ],
     "module": "NodeNext",
-    "moduleResolution": "NodeNext",
+    "moduleResolution": "Node16", // 改成这个
+    // 或直接改成 "Bundler"（Vite 官方推荐之一）
+    // "moduleResolution": "Bundler",
     "jsx": "react-jsx",
     "strict": true,
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "noEmit": true // 建议加上，防止 tsc 输出文件
   },
   "include": [
     "src",
