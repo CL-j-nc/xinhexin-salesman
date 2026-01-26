@@ -114,53 +114,50 @@ const StatusList: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50">
-      <div className="mx-auto max-w-6xl space-y-8 px-6 py-10">
-        <header className="text-center">
+    <div className="min-h-screen bg-slate-50">
+      <div className="mx-auto max-w-6xl space-y-5 px-5 py-8">
+        <header className="border-b border-slate-200 pb-4">
           <h1
-            className="text-2xl font-semibold text-slate-900 md:text-3xl"
+            className="text-lg font-semibold text-slate-900"
             style={{ fontFamily: '"ZCOOL XiaoWei", "Noto Serif SC", serif' }}
           >
             投保申请状态查询
           </h1>
-          <p className="mt-2 text-sm text-slate-600">
-            仅展示核保状态与一次性二维码。
-          </p>
         </header>
 
-        <div className="rounded-2xl border border-slate-200 bg-white/90 p-6 shadow-sm">
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <div className="rounded-lg border border-slate-200 bg-white p-4">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4">
             <input
               placeholder="投保人姓名"
               value={form.proposer}
               onChange={(e) => setForm({ ...form, proposer: e.target.value })}
-              className="rounded-xl border border-slate-200 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-emerald-400"
+              className="rounded-md border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
             />
             <input
               placeholder="被保险人姓名"
               value={form.insured}
               onChange={(e) => setForm({ ...form, insured: e.target.value })}
-              className="rounded-xl border border-slate-200 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-emerald-400"
+              className="rounded-md border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
             />
             <input
               placeholder="车牌号"
               value={form.plate}
               onChange={(e) => setForm({ ...form, plate: e.target.value.toUpperCase() })}
-              className="rounded-xl border border-slate-200 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-emerald-400"
+              className="rounded-md border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
             />
             <input
               placeholder="车架号（VIN）"
               value={form.vin}
               onChange={(e) => setForm({ ...form, vin: e.target.value.toUpperCase() })}
-              className="rounded-xl border border-slate-200 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-emerald-400"
+              className="rounded-md border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
             />
           </div>
 
-          <div className="mt-5 text-center">
+          <div className="mt-4 text-center">
             <button
               onClick={search}
               disabled={loading}
-              className="rounded-2xl bg-emerald-600 px-8 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-50"
+              className="rounded-md bg-emerald-600 px-6 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-50"
             >
               {loading ? "查询中..." : "查询"}
             </button>
@@ -169,7 +166,7 @@ const StatusList: React.FC = () => {
 
         {loading && <div className="text-center text-slate-500">加载中...</div>}
 
-        <section className="grid gap-6 lg:grid-cols-2">
+        <section className="grid gap-4 lg:grid-cols-2">
           {list.map((item, index) => {
             const status = item.status || "UNKNOWN";
             const label = statusMap[status] || status;
@@ -179,18 +176,18 @@ const StatusList: React.FC = () => {
             return (
               <div
                 key={key}
-                className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"
+                className="rounded-lg border border-slate-200 bg-white p-4"
               >
                 <div className="flex items-center justify-between">
-                  <p className="text-sm text-slate-500">核保状态</p>
-                  <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
+                  <p className="text-xs text-slate-500">核保状态</p>
+                  <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700">
                     {label}
                   </span>
                 </div>
 
-                <div className="mt-5 flex flex-col items-center gap-3">
+                <div className="mt-3 flex flex-col items-center gap-2">
                   {status === "COMPLETED" && (
-                    <p className="text-sm text-slate-500">
+                    <p className="text-xs text-slate-500">
                       二维码已失效，状态已完成。
                     </p>
                   )}
@@ -199,15 +196,12 @@ const StatusList: React.FC = () => {
                       <img
                         src={qrSrc}
                         alt="投保二维码"
-                        className="h-44 w-44 rounded-xl border border-slate-100 bg-white p-2"
+                        className="h-32 w-32 rounded-md border border-slate-100 bg-white p-1.5"
                       />
-                      <p className="text-xs text-slate-500">
-                        二维码仅可使用一次，支付完成后自动失效。
-                      </p>
                     </>
                   )}
                   {status !== "COMPLETED" && !qrSrc && (
-                    <p className="text-sm text-slate-500">二维码暂未生成。</p>
+                    <p className="text-xs text-slate-500">二维码暂未生成。</p>
                   )}
                 </div>
               </div>
