@@ -333,13 +333,14 @@ const Salesman: React.FC = () => {
   };
 
   const statusLabel = status ? statusMap[status] || status : "";
-  const statusBadge = status === "APPROVED"
-    ? isNev
-      ? "bg-emerald-100 text-emerald-800"
-      : "bg-slate-100 text-slate-800"
-    : status === "REJECTED"
-      ? "bg-rose-100 text-rose-800"
-      : "bg-amber-100 text-amber-800";
+  const statusBadge =
+    status === "APPROVED"
+      ? isNev
+        ? "bg-emerald-100 text-emerald-800"
+        : "bg-slate-100 text-slate-800"
+      : status === "REJECTED"
+        ? "bg-rose-100 text-rose-800"
+        : "bg-amber-100 text-amber-800";
 
   return (
     <div className="flex min-h-screen flex-col bg-gray-50">
