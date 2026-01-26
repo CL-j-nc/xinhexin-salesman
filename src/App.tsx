@@ -1,22 +1,22 @@
-import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import React from "react";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 
-import Menu from './pages/index';
-import Salesman from './pages/Salesman';
-import Query from './pages/Query';
+import Entry from "./pages/Entry";
+import EnergySelect from "./pages/EnergySelect";
+import Salesman from "./pages/Salesman";
+import StatusList from "./pages/StatusList";
 
 const App: React.FC = () => {
   return (
-    <Router>
+    <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Menu />} />
-        <Route path="/apply" element={<Salesman />} />
-        <Route path="/salesman/apply" element={<Salesman />} />
-        <Route path="/query" element={<Query />} />
-        <Route path="/salesman/query" element={<Query />} />
-        {/* 404 部分不变 */}
+        <Route path="/" element={<Entry />} />
+        <Route path="/apply" element={<EnergySelect />} />
+        <Route path="/apply/form" element={<Salesman />} />
+        <Route path="/history" element={<StatusList />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-    </Router>
+    </BrowserRouter>
   );
 };
 

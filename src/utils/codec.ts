@@ -7,6 +7,8 @@ export interface PersonInfo {
   mobile: string;
   address: string;
   idImage: string;
+  idFront?: File | string | null;
+  idBack?: File | string | null;
   principalName?: string;
   principalIdCard?: string;
   principalAddress?: string;
@@ -28,12 +30,15 @@ export interface VehicleInfo {
   approvedLoad?: string;
   approvedPassengers?: string;
   licenseImage?: string;
+  licenseFront?: File | string | null;
+  licenseBack?: File | string | null;
   energyType: EnergyType;
 }
 
 export interface CoverageItem {
   type: string;
   level?: string;
+  amount?: number;
   addon?: boolean;
   selectable?: boolean;
 }
