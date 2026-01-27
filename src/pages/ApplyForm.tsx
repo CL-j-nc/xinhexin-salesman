@@ -29,20 +29,6 @@ async function apiFetchCoverages(energyType: EnergyType) {
   return res.json();
 }
 
-async function apiCalcPremium(payload: {
-  vehicle: VehicleInfo;
-  owner: PersonInfo;
-  insured: PersonInfo;
-  coverages: CoverageItem[];
-}) {
-  const res = await fetch(`${API_BASE}/api/premium/calc`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-  if (!res.ok) throw new Error("保费试算失败");
-  return res.json();
-}
 
 type Step = "vehicle" | "owner" | "proposer" | "insured" | "coverages";
 
@@ -1235,16 +1221,6 @@ const ApplyForm: React.FC = () => {
   );
 };
 
-export default ApplyForm;
 
-// 保费试算：coverages step 时监听 coverages 变化
-useEffect(() => {
-  if (currentStep === "coverages" && coverages.length > 0) {
-    apiCalcPremium({
-      vehicle,
-      owner,
-      insured: isSameAsProposer ? proposer : insured,
-      coverages,
-    }).catch(() => { });
-  }
-}, [coverages, currentStep]);
+
+export default ApplyForm;
