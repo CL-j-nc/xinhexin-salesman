@@ -1,33 +1,41 @@
-@import url("https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700&family=ZCOOL+XiaoWei&display=swap");
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
-    :root {
-        font-family: "Noto Sans SC", "Source Han Sans SC", sans-serif;
-        text-rendering: optimizeLegibility;
-        -webkit-font-smoothing: antialiased;
-        -moz-osx-font-smoothing: grayscale;
+  /* Page transition */
+  @keyframes page-enter {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
     }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
 
-    html,
-    body,
-    #root {
-        min-height: 100%;
-    }
+  .page-enter {
+    animation: page-enter 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+}
 
-    body {
-        margin: 0;
-        background-color: #f8fafc;
-        color: #0f172a;
-    }
+/* Custom scrollbar for mobile feel */
+::-webkit-scrollbar {
+  width: 0px;
+  background: transparent;
+}
 
-    img,
-    svg,
-    video,
-    canvas {
-        max-width: 100%;
-        height: auto;
-    }
+/* Form focus styles */
+input:focus {
+  outline: none;
+}
+
+/* Card hover effect */
+.hover-float {
+  transition: all 0.3s ease;
+}
+.hover-float:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 12px 24px -8px rgba(0, 0, 0, 0.15);
 }

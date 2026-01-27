@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import QRCode from "qrcode";
 
-const API_BASE = "https://xinhexin-api.chinalife-shiexinhexin.workers.dev";
+const API_BASE = import.meta.env.VITE_API_BASE || "";
 
 const statusMap: Record<string, string> = {
   APPLIED: "已提交",
