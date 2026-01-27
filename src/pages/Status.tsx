@@ -1,220 +1,116 @@
 import React, { useEffect, useState } from "react";
-import QRCode from "qrcode";
 
-const API_BASE = import.meta.env.VITE_API_BASE || "";
+const API_BASE = import.meta.env.VITE_API_BASE;
 
-const statusMap: Record<string, string> = {
-  APPLIED: "已提交",
-  UNDERWRITING: "核保中",
-  APPROVED: "核保通过",
-  REJECTED: "核保拒绝",
-  PAID: "已支付",
-  COMPLETED: "已完成",
-};
-
-type StatusRecord = {
-  status?: string;
-  qr?: string;
-  updatedAt?: string;
-  createdAt?: string;
-};
-
-const StatusList: React.FC = () => {
-  const [form, setForm] = useState({
-    proposer: "",
-    insured: "",
-    plate: "",
-    vin: "",
-  });
-  const [list, setList] = useState<StatusRecord[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [hasSearched, setHasSearched] = useState(false);
-  const [qrImages, setQrImages] = useState<Record<string, string>>({});
-
-  useEffect(() => {
-    const loadRecent = async () => {
-      setLoading(true);
-      try {
-        const res = await fetch(`${API_BASE}/api/application/search?keyword=`);
-        if (res.ok) {
-          const data = await res.json();
-          setList(Array.isArray(data) ? data : []);
-        }
-      } catch (err) {
-        console.error("自动加载失败");
-      } finally {
-        setLoading(false);
-        setHasSearched(true);
-      }
-    };
-    loadRecent();
-  }, []);
-
-  useEffect(() => {
-    let active = true;
-
-    const buildQr = async () => {
-      const next: Record<string, string> = {};
-
-      for (let i = 0; i < list.length; i += 1) {
-        const item = list[i];
-        const key = `${i}-${item.status || "unknown"}`;
-        const payload = item.qr;
-
-        if (!payload || item.status === "COMPLETED") continue;
-
-        if (payload.startsWith("data:image") || payload.startsWith("http")) {
-          next[key] = payload;
-          continue;
-        }
-
-        if (/^[A-Za-z0-9+/=]+$/.test(payload) && payload.length > 80) {
-          next[key] = `data:image/png;base64,${payload}`;
-          continue;
-        }
-
-        try {
-          const dataUrl = await QRCode.toDataURL(payload, { margin: 1, width: 220 });
-          next[key] = dataUrl;
-        } catch (error) {
-          console.error("二维码生成失败");
-        }
-      }
-
-      if (active) {
-        setQrImages(next);
-      }
-    };
-
-    buildQr();
-    return () => {
-      active = false;
-    };
-  }, [list]);
-
-  const search = async () => {
-    const keyword =
-      [form.proposer, form.insured, form.plate, form.vin].filter(Boolean).join(" ") || "";
-
-    setLoading(true);
-    setHasSearched(true);
-    try {
-      const res = await fetch(
-        `${API_BASE}/api/application/search?keyword=${encodeURIComponent(keyword)}`
-      );
-      if (!res.ok) throw new Error(`请求失败: ${res.status}`);
-      const data = await res.json();
-      setList(Array.isArray(data) ? data : []);
-    } catch (err: any) {
-      alert("查询失败: " + err.message);
-      setList([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="min-h-screen bg-slate-50">
-      <div className="mx-auto max-w-6xl space-y-5 px-5 py-8">
-        <header className="border-b border-slate-200 pb-4">
-          <h1
-            className="text-lg font-semibold text-slate-900"
-            style={{ fontFamily: '"ZCOOL XiaoWei", "Noto Serif SC", serif' }}
-          >
-            投保申请状态查询
-          </h1>
-        </header>
-
-        <div className="rounded-lg border border-slate-200 bg-white p-4">
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4">
-            <input
-              placeholder="投保人姓名"
-              value={form.proposer}
-              onChange={(e) => setForm({ ...form, proposer: e.target.value })}
-              className="rounded-md border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
-            />
-            <input
-              placeholder="被保险人姓名"
-              value={form.insured}
-              onChange={(e) => setForm({ ...form, insured: e.target.value })}
-              className="rounded-md border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
-            />
-            <input
-              placeholder="车牌号"
-              value={form.plate}
-              onChange={(e) => setForm({ ...form, plate: e.target.value.toUpperCase() })}
-              className="rounded-md border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
-            />
-            <input
-              placeholder="车架号（VIN）"
-              value={form.vin}
-              onChange={(e) => setForm({ ...form, vin: e.target.value.toUpperCase() })}
-              className="rounded-md border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
-            />
-          </div>
-
-          <div className="mt-4 text-center">
-            <button
-              onClick={search}
-              disabled={loading}
-              className="rounded-md bg-emerald-600 px-6 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-50"
-            >
-              {loading ? "查询中..." : "查询"}
-            </button>
+function renderStatusUI(data: any) {
+  switch (data.status) {
+    case "UNDERWRITING":
+    case "MANUAL_REVIEW":
+      return (
+        <div className="text-center space-y-4">
+          <div className="animate-spin text-4xl">⏳</div>
+          <div className="text-lg font-bold">正在核保中</div>
+          <div className="text-sm text-gray-500">
+            系统正在进行风险评估，请耐心等待
           </div>
         </div>
+      );
 
-        {loading && <div className="text-center text-slate-500">加载中...</div>}
+    case "APPROVED":
+      return (
+        <div className="text-center space-y-4">
+          <div className="text-4xl text-green-600">✅</div>
+          <div className="text-lg font-bold">核保通过</div>
+          <div>预计保费：¥ {data.premium}</div>
+        </div>
+      );
 
-        <section className="grid gap-4 lg:grid-cols-2">
-          {list.map((item, index) => {
-            const status = item.status || "UNKNOWN";
-            const label = statusMap[status] || status;
-            const key = `${index}-${status}`;
-            const qrSrc = qrImages[key];
+    case "ISSUED":
+      return (
+        <div className="text-center space-y-4">
+          <div className="text-4xl text-green-600">🎉</div>
+          <div className="text-lg font-bold">投保成功</div>
+          <div>保单号：{data.policyNo}</div>
+        </div>
+      );
 
-            return (
-              <div
-                key={key}
-                className="rounded-lg border border-slate-200 bg-white p-4"
-              >
-                <div className="flex items-center justify-between">
-                  <p className="text-xs text-slate-500">核保状态</p>
-                  <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700">
-                    {label}
-                  </span>
-                </div>
+    case "REJECTED":
+      return (
+        <div className="text-center space-y-4">
+          <div className="text-4xl text-red-500">❌</div>
+          <div className="text-lg font-bold">核保未通过</div>
+          <div className="text-sm text-gray-500">
+            原因：{data.reason || "不符合承保规则"}
+          </div>
+        </div>
+      );
 
-                <div className="mt-3 flex flex-col items-center gap-2">
-                  {status === "COMPLETED" && (
-                    <p className="text-xs text-slate-500">
-                      二维码已失效，状态已完成。
-                    </p>
-                  )}
-                  {status !== "COMPLETED" && qrSrc && (
-                    <>
-                      <img
-                        src={qrSrc}
-                        alt="投保二维码"
-                        className="h-32 w-32 rounded-md border border-slate-100 bg-white p-1.5"
-                      />
-                    </>
-                  )}
-                  {status !== "COMPLETED" && !qrSrc && (
-                    <p className="text-xs text-slate-500">二维码暂未生成。</p>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </section>
+    default:
+      return (
+        <div className="text-center space-y-4">
+          <div className="text-4xl text-gray-400">⚠️</div>
+          <div className="text-lg font-bold">系统异常</div>
+        </div>
+      );
+  }
+}
 
-        {!loading && hasSearched && list.length === 0 && (
-          <div className="text-center text-slate-500">暂无符合条件的记录。</div>
-        )}
-      </div>
+export default function Status() {
+  const [data, setData] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const applicationNo = sessionStorage.getItem("applicationNo");
+    if (!applicationNo) {
+      setError("缺少申请单号");
+      return;
+    }
+
+    let timer: number;
+
+    const queryStatus = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/underwriting/status`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ applicationNo }),
+        });
+
+        if (!res.ok) throw new Error("查询失败");
+
+        const json = await res.json();
+        setData(json);
+
+        // 终态停止轮询
+        if (
+          json.status === "ISSUED" ||
+          json.status === "REJECTED"
+        ) {
+          clearInterval(timer);
+        }
+      } catch (e: any) {
+        setError(e.message || "接口异常");
+        clearInterval(timer);
+      }
+    };
+
+    queryStatus();
+    timer = window.setInterval(queryStatus, 5000);
+
+    return () => clearInterval(timer);
+  }, []);
+
+  if (error) {
+    return <div className="p-6 text-red-500">{error}</div>;
+  }
+
+  if (!data) {
+    return <div className="p-6">核保中，请稍候…</div>;
+  }
+
+  return (
+    <div className="p-6 min-h-screen">
+      {renderStatusUI(data)}
     </div>
   );
-};
-
-export default StatusList;
+}

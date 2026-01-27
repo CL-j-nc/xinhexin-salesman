@@ -7,6 +7,43 @@ import DocumentTypePopup from "../components/DocumentTypePopup";
 
 const API_BASE = import.meta.env.VITE_API_BASE || "";
 
+// --- 新增 API 接口函数 ---
+async function apiParseVehicle(data: {
+  plate?: string;
+  vin?: string;
+}) {
+  const res = await fetch(`${API_BASE}/api/vehicle/parse`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error("车辆解析失败");
+  return res.json();
+}
+
+async function apiFetchCoverages(energyType: EnergyType) {
+  const res = await fetch(
+    `${API_BASE}/api/coverage/list?energyType=${energyType}`
+  );
+  if (!res.ok) throw new Error("险种加载失败");
+  return res.json();
+}
+
+async function apiCalcPremium(payload: {
+  vehicle: VehicleInfo;
+  owner: PersonInfo;
+  insured: PersonInfo;
+  coverages: CoverageItem[];
+}) {
+  const res = await fetch(`${API_BASE}/api/premium/calc`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw new Error("保费试算失败");
+  return res.json();
+}
+
 type Step = "vehicle" | "owner" | "proposer" | "insured" | "coverages";
 
 interface PersonInfo {
@@ -53,14 +90,14 @@ const BottomSheet: React.FC<BottomSheetProps> = ({ visible, onClose, title, chil
 
   return (
     <div className="fixed inset-0 z-50 flex items-end">
-      <div 
+      <div
         className="absolute inset-0 bg-black/40"
         onClick={onClose}
       />
       <div className="relative w-full bg-white rounded-t-2xl shadow-2xl animate-sheet-up max-h-[70vh] overflow-y-auto">
         <div className="sticky top-0 bg-white border-b border-gray-100 px-4 py-3 flex items-center justify-between">
           <h3 className="text-base font-bold text-gray-800">{title}</h3>
-          <button 
+          <button
             type="button"
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600 text-xl"
@@ -85,11 +122,11 @@ const ApplyForm: React.FC = () => {
 
   // Color scheme based on energy type
   const isNEV = energyType === "NEV";
-  const bgClass = isNEV 
-    ? "bg-gradient-to-b from-emerald-50 via-emerald-50/30 to-white" 
+  const bgClass = isNEV
+    ? "bg-gradient-to-b from-emerald-50 via-emerald-50/30 to-white"
     : "bg-[#f7f9fc]";
-  const headerClass = isNEV 
-    ? "bg-gradient-to-r from-emerald-500 to-emerald-600" 
+  const headerClass = isNEV
+    ? "bg-gradient-to-r from-emerald-500 to-emerald-600"
     : "bg-emerald-500";
   const activeTabClass = isNEV
     ? "bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-md"
@@ -147,10 +184,19 @@ const ApplyForm: React.FC = () => {
 
   const [coverages, setCoverages] = useState<CoverageItem[]>([]);
 
+  // 险种列表 options
+  const [coverageOptions, setCoverageOptions] = useState<any[]>([]);
+  // 拉取险种列表
+  useEffect(() => {
+    apiFetchCoverages(energyType)
+      .then(setCoverageOptions)
+      .catch(() => { });
+  }, [energyType]);
+
   // Bottom sheet state
   const [showCoverageSheet, setShowCoverageSheet] = useState(false);
   const [selectedCoverageType, setSelectedCoverageType] = useState<string>("");
-  
+
   // Document type popup state
   const [showDocumentPopup, setShowDocumentPopup] = useState(false);
   const [documentFor, setDocumentFor] = useState<"proposer" | "insured" | "owner" | "proposer-principal" | "insured-principal" | "owner-principal">("proposer");
@@ -298,13 +344,13 @@ const ApplyForm: React.FC = () => {
 
   return (
     <div className={cn(
-      "min-h-screen flex flex-col font-sans",
-      isNEV 
-        ? "bg-gradient-to-b from-emerald-500 via-emerald-300 to-white" 
+      "min-h-screen flex flex-col font-sans animate-page-enter",
+      isNEV
+        ? "bg-gradient-to-b from-emerald-500 via-emerald-300 to-white"
         : "bg-[#f7f9fc]"
     )}>
       {/* Header */}
-      <Header 
+      <Header
         energyType={energyType}
         title="承保信息填写"
         showBackButton={true}
@@ -337,9 +383,9 @@ const ApplyForm: React.FC = () => {
       <main className="flex-1 p-4 overflow-y-auto pb-24">
         {/* Proposer Step */}
         {currentStep === "proposer" && (
-          <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 space-y-4">
+          <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 space-y-4 animate-page-enter">
             <h3 className="text-sm font-bold text-gray-800 mb-4">投保人信息</h3>
-            
+
             <div className="flex items-center border-b border-gray-50 py-3">
               <span className="w-24 text-gray-500 text-sm">主体属性</span>
               <div className="flex gap-4">
@@ -374,7 +420,7 @@ const ApplyForm: React.FC = () => {
               />
             </div>
 
-            <div 
+            <div
               className="flex items-center border-b border-gray-50 py-3 cursor-pointer active:bg-gray-50"
               onClick={() => {
                 setDocumentFor("proposer");
@@ -426,7 +472,7 @@ const ApplyForm: React.FC = () => {
                 onChange={e => {
                   const file = e.target.files?.[0];
                   if (file) {
-                    handleImageUpload(file, (base64) => 
+                    handleImageUpload(file, (base64) =>
                       setProposer({ ...proposer, idImage: base64 })
                     );
                   }
@@ -476,7 +522,7 @@ const ApplyForm: React.FC = () => {
                 onChange={e => {
                   const file = e.target.files?.[0];
                   if (file) {
-                    handleImageUpload(file, (base64) => 
+                    handleImageUpload(file, (base64) =>
                       setProposer({ ...proposer, principalIdImage: base64 })
                     );
                   }
@@ -486,72 +532,72 @@ const ApplyForm: React.FC = () => {
               {proposer.principalIdImage && (
                 <div className="mt-2 text-xs text-emerald-600">✓ 已上传</div>
               )}
-</div>
+            </div>
 
-             {/* Legal Person Info for Enterprise */}
-             {proposer.identityType === "enterprise" && (
-               <div className="mt-6 space-y-4">
-                 <h4 className="text-sm font-bold text-gray-800">法人/企业负责人信息</h4>
-                 
-                 <div className="flex items-center border-b border-gray-50 py-3">
-                   <span className="w-24 text-gray-500 text-sm">姓名</span>
-                   <input
-                     value={proposer.principalName || ""}
-                     onChange={e => setProposer({ ...proposer, principalName: e.target.value })}
-                     placeholder="请输入法人姓名"
-                     className="flex-1 outline-none text-sm"
-                   />
-                 </div>
+            {/* Legal Person Info for Enterprise */}
+            {proposer.identityType === "enterprise" && (
+              <div className="mt-6 space-y-4">
+                <h4 className="text-sm font-bold text-gray-800">法人/企业负责人信息</h4>
 
-                 <div className="flex items-center border-b border-gray-50 py-3">
-                   <span className="w-24 text-gray-500 text-sm">证件号码</span>
-                   <input
-                     value={proposer.principalIdCard || ""}
-                     onChange={e => setProposer({ ...proposer, principalIdCard: e.target.value })}
-                     placeholder="请输入法人证件号码"
-                     className="flex-1 outline-none text-sm"
-                   />
-                 </div>
+                <div className="flex items-center border-b border-gray-50 py-3">
+                  <span className="w-24 text-gray-500 text-sm">姓名</span>
+                  <input
+                    value={proposer.principalName || ""}
+                    onChange={e => setProposer({ ...proposer, principalName: e.target.value })}
+                    placeholder="请输入法人姓名"
+                    className="flex-1 outline-none text-sm"
+                  />
+                </div>
 
-                 <div className="flex items-center border-b border-gray-50 py-3">
-                   <span className="w-24 text-gray-500 text-sm">联系地址</span>
-                   <input
-                     value={proposer.principalAddress || ""}
-                     onChange={e => setProposer({ ...proposer, principalAddress: e.target.value })}
-                     placeholder="请输入法人地址"
-                     className="flex-1 outline-none text-sm"
-                   />
-                 </div>
+                <div className="flex items-center border-b border-gray-50 py-3">
+                  <span className="w-24 text-gray-500 text-sm">证件号码</span>
+                  <input
+                    value={proposer.principalIdCard || ""}
+                    onChange={e => setProposer({ ...proposer, principalIdCard: e.target.value })}
+                    placeholder="请输入法人证件号码"
+                    className="flex-1 outline-none text-sm"
+                  />
+                </div>
 
-                 <div className="border-b border-gray-50 py-3">
-                   <span className="block text-gray-500 text-sm mb-2">证件照片</span>
-                   <input
-                     type="file"
-                     accept="image/*"
-                     onChange={e => {
-                       const file = e.target.files?.[0];
-                       if (file) {
-                         handleImageUpload(file, (base64) => 
-                           setProposer({ ...proposer, principalIdImage: base64 })
-                         );
-                       }
-                     }}
-                     className="text-sm"
-                   />
-                   {proposer.principalIdImage && (
-                     <div className="mt-2 text-xs text-emerald-600">✓ 已上传</div>
-                   )}
-                 </div>
-               </div>
-             )}
-           </div>
-         )}
+                <div className="flex items-center border-b border-gray-50 py-3">
+                  <span className="w-24 text-gray-500 text-sm">联系地址</span>
+                  <input
+                    value={proposer.principalAddress || ""}
+                    onChange={e => setProposer({ ...proposer, principalAddress: e.target.value })}
+                    placeholder="请输入法人地址"
+                    className="flex-1 outline-none text-sm"
+                  />
+                </div>
+
+                <div className="border-b border-gray-50 py-3">
+                  <span className="block text-gray-500 text-sm mb-2">证件照片</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={e => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        handleImageUpload(file, (base64) =>
+                          setProposer({ ...proposer, principalIdImage: base64 })
+                        );
+                      }
+                    }}
+                    className="text-sm"
+                  />
+                  {proposer.principalIdImage && (
+                    <div className="mt-2 text-xs text-emerald-600">✓ 已上传</div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Insured Step */}
         {currentStep === "insured" && (
-          <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 space-y-4">
+          <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 space-y-4 animate-page-enter">
             <h3 className="text-sm font-bold text-gray-800 mb-4">被保险人信息</h3>
-            
+
             <div className="flex items-center justify-between mb-6 py-2 border-b border-gray-50">
               <span className="text-sm text-gray-600">是否与投保人一致</span>
               <div className="flex gap-4">
@@ -612,7 +658,7 @@ const ApplyForm: React.FC = () => {
                   />
                 </div>
 
-                <div 
+                <div
                   className="flex items-center border-b border-gray-50 py-3 cursor-pointer active:bg-gray-50"
                   onClick={() => {
                     setDocumentFor("insured");
@@ -664,7 +710,7 @@ const ApplyForm: React.FC = () => {
                     onChange={e => {
                       const file = e.target.files?.[0];
                       if (file) {
-                        handleImageUpload(file, (base64) => 
+                        handleImageUpload(file, (base64) =>
                           setInsured({ ...insured, idImage: base64 })
                         );
                       }
@@ -676,76 +722,76 @@ const ApplyForm: React.FC = () => {
                   )}
                 </div>
 
-                 {/* Legal Person Info for Enterprise */}
-                 {insured.identityType === "enterprise" && (
-                   <div className="mt-6 space-y-4">
-                     <h4 className="text-sm font-bold text-gray-800">法人/企业负责人信息</h4>
-                     
-                     <div className="flex items-center border-b border-gray-50 py-3">
-                       <span className="w-24 text-gray-500 text-sm">姓名</span>
-                       <input
-                         value={insured.principalName || ""}
-                         onChange={e => setInsured({ ...insured, principalName: e.target.value })}
-                         placeholder="请输入法人姓名"
-                         className="flex-1 outline-none text-sm"
-                       />
-                     </div>
+                {/* Legal Person Info for Enterprise */}
+                {insured.identityType === "enterprise" && (
+                  <div className="mt-6 space-y-4">
+                    <h4 className="text-sm font-bold text-gray-800">法人/企业负责人信息</h4>
 
-                     <div className="flex items-center border-b border-gray-50 py-3">
-                       <span className="w-24 text-gray-500 text-sm">证件号码</span>
-                       <input
-                         value={insured.principalIdCard || ""}
-                         onChange={e => setInsured({ ...insured, principalIdCard: e.target.value })}
-                         placeholder="请输入法人证件号码"
-                         className="flex-1 outline-none text-sm"
-                       />
-                     </div>
+                    <div className="flex items-center border-b border-gray-50 py-3">
+                      <span className="w-24 text-gray-500 text-sm">姓名</span>
+                      <input
+                        value={insured.principalName || ""}
+                        onChange={e => setInsured({ ...insured, principalName: e.target.value })}
+                        placeholder="请输入法人姓名"
+                        className="flex-1 outline-none text-sm"
+                      />
+                    </div>
 
-                     <div className="flex items-center border-b border-gray-50 py-3">
-                       <span className="w-24 text-gray-500 text-sm">联系地址</span>
-                       <input
-                         value={insured.principalAddress || ""}
-                         onChange={e => setInsured({ ...insured, principalAddress: e.target.value })}
-                         placeholder="请输入法人地址"
-                         className="flex-1 outline-none text-sm"
-                       />
-                     </div>
+                    <div className="flex items-center border-b border-gray-50 py-3">
+                      <span className="w-24 text-gray-500 text-sm">证件号码</span>
+                      <input
+                        value={insured.principalIdCard || ""}
+                        onChange={e => setInsured({ ...insured, principalIdCard: e.target.value })}
+                        placeholder="请输入法人证件号码"
+                        className="flex-1 outline-none text-sm"
+                      />
+                    </div>
 
-                     <div className="border-b border-gray-50 py-3">
-                       <span className="block text-gray-500 text-sm mb-2">证件照片</span>
-                       <input
-                         type="file"
-                         accept="image/*"
-                         onChange={e => {
-                           const file = e.target.files?.[0];
-                           if (file) {
-                             handleImageUpload(file, (base64) => 
-                               setInsured({ ...insured, principalIdImage: base64 })
-                             );
-                           }
-                         }}
-                         className="text-sm"
-                       />
-                       {insured.principalIdImage && (
-                         <div className="mt-2 text-xs text-emerald-600">✓ 已上传</div>
-                       )}
-                     </div>
-                   </div>
-                 )}
-               </div>
-             )}
+                    <div className="flex items-center border-b border-gray-50 py-3">
+                      <span className="w-24 text-gray-500 text-sm">联系地址</span>
+                      <input
+                        value={insured.principalAddress || ""}
+                        onChange={e => setInsured({ ...insured, principalAddress: e.target.value })}
+                        placeholder="请输入法人地址"
+                        className="flex-1 outline-none text-sm"
+                      />
+                    </div>
 
-             {isSameAsProposer && (
-               <div className="text-center py-8 text-gray-400 text-sm">
-                 被保险人与投保人为同一人
-               </div>
-             )}
-           </div>
-         )}
+                    <div className="border-b border-gray-50 py-3">
+                      <span className="block text-gray-500 text-sm mb-2">证件照片</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={e => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            handleImageUpload(file, (base64) =>
+                              setInsured({ ...insured, principalIdImage: base64 })
+                            );
+                          }
+                        }}
+                        className="text-sm"
+                      />
+                      {insured.principalIdImage && (
+                        <div className="mt-2 text-xs text-emerald-600">✓ 已上传</div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {isSameAsProposer && (
+              <div className="text-center py-8 text-gray-400 text-sm">
+                被保险人与投保人为同一人
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Vehicle Step */}
         {currentStep === "vehicle" && (
-          <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 space-y-4">
+          <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 space-y-4 animate-page-enter">
             <div className="flex items-center justify-between mb-6">
               <div className={cn(
                 "px-3 py-1 rounded text-sm font-bold",
@@ -765,6 +811,22 @@ const ApplyForm: React.FC = () => {
                 onChange={e => setVehicle({ ...vehicle, plate: e.target.value.toUpperCase() })}
                 placeholder="请输入车牌号"
                 className="flex-1 outline-none text-sm"
+                onBlur={async () => {
+                  // 原有逻辑不变，追加接口调用
+                  if (vehicle.plate || vehicle.vin) {
+                    try {
+                      const data = await apiParseVehicle({
+                        plate: vehicle.plate,
+                        vin: vehicle.vin,
+                      });
+                      setVehicle(prev => ({
+                        ...prev,
+                        brand: data.brand ?? prev.brand,
+                        engineNo: data.engineNo ?? prev.engineNo,
+                      }));
+                    } catch { }
+                  }
+                }}
               />
             </div>
 
@@ -775,6 +837,22 @@ const ApplyForm: React.FC = () => {
                 onChange={e => setVehicle({ ...vehicle, vin: e.target.value.toUpperCase() })}
                 placeholder="请输入VIN"
                 className="flex-1 outline-none text-sm"
+                onBlur={async () => {
+                  // 原有逻辑不变，追加接口调用
+                  if (vehicle.plate || vehicle.vin) {
+                    try {
+                      const data = await apiParseVehicle({
+                        plate: vehicle.plate,
+                        vin: vehicle.vin,
+                      });
+                      setVehicle(prev => ({
+                        ...prev,
+                        brand: data.brand ?? prev.brand,
+                        engineNo: data.engineNo ?? prev.engineNo,
+                      }));
+                    } catch { }
+                  }
+                }}
               />
             </div>
 
@@ -829,7 +907,7 @@ const ApplyForm: React.FC = () => {
                 onChange={e => {
                   const file = e.target.files?.[0];
                   if (file) {
-                    handleImageUpload(file, (base64) => 
+                    handleImageUpload(file, (base64) =>
                       setVehicle({ ...vehicle, licenseImage: base64 })
                     );
                   }
@@ -840,178 +918,178 @@ const ApplyForm: React.FC = () => {
                 <div className="mt-2 text-xs text-emerald-600">✓ 已上传</div>
               )}
             </div>
-</div>
-         )}
+          </div>
+        )}
 
-         {/* Owner Step */}
-         {currentStep === "owner" && (
-           <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 space-y-4">
-             <h3 className="text-sm font-bold text-gray-800 mb-4">车主信息</h3>
-             
-             <div className="flex items-center border-b border-gray-50 py-3">
-               <span className="w-24 text-gray-500 text-sm">主体属性</span>
-               <div className="flex gap-4">
-                 <label className="flex items-center gap-1 text-sm">
-                   <input
-                     type="radio"
-                     checked={owner.identityType === "individual"}
-                     onChange={() => setOwner({ ...owner, identityType: "individual" })}
-                     className="accent-emerald-500"
-                   />
-                   个人
-                 </label>
-                 <label className="flex items-center gap-1 text-sm">
-                   <input
-                     type="radio"
-                     checked={owner.identityType === "enterprise"}
-                     onChange={() => setOwner({ ...owner, identityType: "enterprise" })}
-                     className="accent-emerald-500"
-                   />
-                   单位
-                 </label>
-               </div>
-             </div>
+        {/* Owner Step */}
+        {currentStep === "owner" && (
+          <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 space-y-4 animate-page-enter">
+            <h3 className="text-sm font-bold text-gray-800 mb-4">车主信息</h3>
 
-             <div className="flex items-center border-b border-gray-50 py-3">
-               <span className="w-24 text-gray-500 text-sm">车主名称</span>
-               <input
-                 value={owner.name}
-                 onChange={e => setOwner({ ...owner, name: e.target.value })}
-                 placeholder="请输入车主名称"
-                 className="flex-1 outline-none text-sm"
-               />
-             </div>
+            <div className="flex items-center border-b border-gray-50 py-3">
+              <span className="w-24 text-gray-500 text-sm">主体属性</span>
+              <div className="flex gap-4">
+                <label className="flex items-center gap-1 text-sm">
+                  <input
+                    type="radio"
+                    checked={owner.identityType === "individual"}
+                    onChange={() => setOwner({ ...owner, identityType: "individual" })}
+                    className="accent-emerald-500"
+                  />
+                  个人
+                </label>
+                <label className="flex items-center gap-1 text-sm">
+                  <input
+                    type="radio"
+                    checked={owner.identityType === "enterprise"}
+                    onChange={() => setOwner({ ...owner, identityType: "enterprise" })}
+                    className="accent-emerald-500"
+                  />
+                  单位
+                </label>
+              </div>
+            </div>
 
-             <div 
-               className="flex items-center border-b border-gray-50 py-3 cursor-pointer active:bg-gray-50"
-               onClick={() => {
-                 setDocumentFor("owner");
-                 setShowDocumentPopup(true);
-               }}
-             >
-               <span className="w-24 text-gray-500 text-sm">证件类型</span>
-               <div className="flex-1 flex items-center justify-between">
-                 <span className="text-sm">{owner.idType}</span>
-                 <span className="text-gray-400">›</span>
-               </div>
-             </div>
+            <div className="flex items-center border-b border-gray-50 py-3">
+              <span className="w-24 text-gray-500 text-sm">车主名称</span>
+              <input
+                value={owner.name}
+                onChange={e => setOwner({ ...owner, name: e.target.value })}
+                placeholder="请输入车主名称"
+                className="flex-1 outline-none text-sm"
+              />
+            </div>
 
-             <div className="flex items-center border-b border-gray-50 py-3">
-               <span className="w-24 text-gray-500 text-sm">证件号码</span>
-               <input
-                 value={owner.idCard}
-                 onChange={e => setOwner({ ...owner, idCard: e.target.value })}
-                 placeholder="请输入证件号码"
-                 className="flex-1 outline-none text-sm"
-               />
-             </div>
+            <div
+              className="flex items-center border-b border-gray-50 py-3 cursor-pointer active:bg-gray-50"
+              onClick={() => {
+                setDocumentFor("owner");
+                setShowDocumentPopup(true);
+              }}
+            >
+              <span className="w-24 text-gray-500 text-sm">证件类型</span>
+              <div className="flex-1 flex items-center justify-between">
+                <span className="text-sm">{owner.idType}</span>
+                <span className="text-gray-400">›</span>
+              </div>
+            </div>
 
-             <div className="flex items-center border-b border-gray-50 py-3">
-               <span className="w-24 text-gray-500 text-sm">联系电话</span>
-               <input
-                 value={owner.mobile}
-                 onChange={e => setOwner({ ...owner, mobile: e.target.value })}
-                 placeholder="请输入手机号"
-                 className="flex-1 outline-none text-sm"
-               />
-             </div>
+            <div className="flex items-center border-b border-gray-50 py-3">
+              <span className="w-24 text-gray-500 text-sm">证件号码</span>
+              <input
+                value={owner.idCard}
+                onChange={e => setOwner({ ...owner, idCard: e.target.value })}
+                placeholder="请输入证件号码"
+                className="flex-1 outline-none text-sm"
+              />
+            </div>
 
-             <div className="flex items-center border-b border-gray-50 py-3">
-               <span className="w-24 text-gray-500 text-sm">联系地址</span>
-               <input
-                 value={owner.address}
-                 onChange={e => setOwner({ ...owner, address: e.target.value })}
-                 placeholder="请输入地址"
-                 className="flex-1 outline-none text-sm"
-               />
-             </div>
+            <div className="flex items-center border-b border-gray-50 py-3">
+              <span className="w-24 text-gray-500 text-sm">联系电话</span>
+              <input
+                value={owner.mobile}
+                onChange={e => setOwner({ ...owner, mobile: e.target.value })}
+                placeholder="请输入手机号"
+                className="flex-1 outline-none text-sm"
+              />
+            </div>
 
-             <div className="border-b border-gray-50 py-3">
-               <span className="block text-gray-500 text-sm mb-2">证件照片</span>
-               <input
-                 type="file"
-                 accept="image/*"
-                 onChange={e => {
-                   const file = e.target.files?.[0];
-                   if (file) {
-                     handleImageUpload(file, (base64) => 
-                       setOwner({ ...owner, idImage: base64 })
-                     );
-                   }
-                 }}
-                 className="text-sm"
-               />
-               {owner.idImage && (
-                 <div className="mt-2 text-xs text-emerald-600">✓ 已上传</div>
-               )}
-             </div>
+            <div className="flex items-center border-b border-gray-50 py-3">
+              <span className="w-24 text-gray-500 text-sm">联系地址</span>
+              <input
+                value={owner.address}
+                onChange={e => setOwner({ ...owner, address: e.target.value })}
+                placeholder="请输入地址"
+                className="flex-1 outline-none text-sm"
+              />
+            </div>
 
-             {/* Legal Person Info for Enterprise */}
-             {owner.identityType === "enterprise" && (
-               <div className="mt-6 space-y-4">
-                 <h4 className="text-sm font-bold text-gray-800">法人/企业负责人信息</h4>
-                 
-                 <div className="flex items-center border-b border-gray-50 py-3">
-<span className="w-24 text-gray-500 text-sm">投保人名称</span>
-                   <input
-                     value={owner.principalName || ""}
-                     onChange={e => setOwner({ ...owner, principalName: e.target.value })}
-                     placeholder="请输入法人姓名"
-                     className="flex-1 outline-none text-sm"
-                   />
-                 </div>
+            <div className="border-b border-gray-50 py-3">
+              <span className="block text-gray-500 text-sm mb-2">证件照片</span>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={e => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    handleImageUpload(file, (base64) =>
+                      setOwner({ ...owner, idImage: base64 })
+                    );
+                  }
+                }}
+                className="text-sm"
+              />
+              {owner.idImage && (
+                <div className="mt-2 text-xs text-emerald-600">✓ 已上传</div>
+              )}
+            </div>
 
-                 <div className="flex items-center border-b border-gray-50 py-3">
-                   <span className="w-24 text-gray-500 text-sm">证件号码</span>
-                   <input
-                     value={owner.principalIdCard || ""}
-                     onChange={e => setOwner({ ...owner, principalIdCard: e.target.value })}
-                     placeholder="请输入法人证件号码"
-                     className="flex-1 outline-none text-sm"
-                   />
-                 </div>
+            {/* Legal Person Info for Enterprise */}
+            {owner.identityType === "enterprise" && (
+              <div className="mt-6 space-y-4">
+                <h4 className="text-sm font-bold text-gray-800">法人/企业负责人信息</h4>
 
-                 <div className="flex items-center border-b border-gray-50 py-3">
-                   <span className="w-24 text-gray-500 text-sm">联系地址</span>
-                   <input
-                     value={owner.principalAddress || ""}
-                     onChange={e => setOwner({ ...owner, principalAddress: e.target.value })}
-                     placeholder="请输入法人地址"
-                     className="flex-1 outline-none text-sm"
-                   />
-                 </div>
+                <div className="flex items-center border-b border-gray-50 py-3">
+                  <span className="w-24 text-gray-500 text-sm">投保人名称</span>
+                  <input
+                    value={owner.principalName || ""}
+                    onChange={e => setOwner({ ...owner, principalName: e.target.value })}
+                    placeholder="请输入法人姓名"
+                    className="flex-1 outline-none text-sm"
+                  />
+                </div>
 
-                 <div className="border-b border-gray-50 py-3">
-                   <span className="block text-gray-500 text-sm mb-2">证件照片</span>
-                   <input
-                     type="file"
-                     accept="image/*"
-                     onChange={e => {
-                       const file = e.target.files?.[0];
-                       if (file) {
-                         handleImageUpload(file, (base64) => 
-                           setOwner({ ...owner, principalIdImage: base64 })
-                         );
-                       }
-                     }}
-                     className="text-sm"
-                   />
-                   {owner.principalIdImage && (
-                     <div className="mt-2 text-xs text-emerald-600">✓ 已上传</div>
-                   )}
-                 </div>
-               </div>
-             )}
-           </div>
-         )}
+                <div className="flex items-center border-b border-gray-50 py-3">
+                  <span className="w-24 text-gray-500 text-sm">证件号码</span>
+                  <input
+                    value={owner.principalIdCard || ""}
+                    onChange={e => setOwner({ ...owner, principalIdCard: e.target.value })}
+                    placeholder="请输入法人证件号码"
+                    className="flex-1 outline-none text-sm"
+                  />
+                </div>
 
-         {/* Coverages Step */}
+                <div className="flex items-center border-b border-gray-50 py-3">
+                  <span className="w-24 text-gray-500 text-sm">联系地址</span>
+                  <input
+                    value={owner.principalAddress || ""}
+                    onChange={e => setOwner({ ...owner, principalAddress: e.target.value })}
+                    placeholder="请输入法人地址"
+                    className="flex-1 outline-none text-sm"
+                  />
+                </div>
+
+                <div className="border-b border-gray-50 py-3">
+                  <span className="block text-gray-500 text-sm mb-2">证件照片</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={e => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        handleImageUpload(file, (base64) =>
+                          setOwner({ ...owner, principalIdImage: base64 })
+                        );
+                      }
+                    }}
+                    className="text-sm"
+                  />
+                  {owner.principalIdImage && (
+                    <div className="mt-2 text-xs text-emerald-600">✓ 已上传</div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Coverages Step */}
         {currentStep === "coverages" && (
-          <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 space-y-4">
+          <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 space-y-4 animate-page-enter">
             <h3 className="text-sm font-bold text-gray-800 mb-4">险种选择</h3>
 
             {/* Third Party Liability */}
-            <div 
+            <div
               onClick={() => openCoverageSelector("third_party")}
               className="flex items-center justify-between border-b border-gray-50 py-3 cursor-pointer active:bg-gray-50"
             >
@@ -1028,7 +1106,7 @@ const ApplyForm: React.FC = () => {
             </div>
 
             {/* Vehicle Damage */}
-            <div 
+            <div
               onClick={() => openCoverageSelector("damage")}
               className="flex items-center justify-between border-b border-gray-50 py-3 cursor-pointer active:bg-gray-50"
             >
@@ -1094,8 +1172,8 @@ const ApplyForm: React.FC = () => {
           disabled={submitting}
           className={cn(
             "w-full text-white font-bold py-3.5 rounded-xl shadow-lg active:scale-[0.98] transition-all disabled:opacity-50",
-            isNEV 
-              ? "bg-gradient-to-r from-emerald-500 to-emerald-600" 
+            isNEV
+              ? "bg-gradient-to-r from-emerald-500 to-emerald-600"
               : "bg-emerald-500"
           )}
         >
@@ -1149,8 +1227,8 @@ const ApplyForm: React.FC = () => {
         }}
         currentValue={
           documentFor === "proposer" ? proposer.idType :
-          documentFor === "owner" ? owner.idType :
-          documentFor === "insured" ? insured.idType : ""
+            documentFor === "owner" ? owner.idType :
+              documentFor === "insured" ? insured.idType : ""
         }
       />
     </div>
@@ -1158,3 +1236,15 @@ const ApplyForm: React.FC = () => {
 };
 
 export default ApplyForm;
+
+// 保费试算：coverages step 时监听 coverages 变化
+useEffect(() => {
+  if (currentStep === "coverages" && coverages.length > 0) {
+    apiCalcPremium({
+      vehicle,
+      owner,
+      insured: isSameAsProposer ? proposer : insured,
+      coverages,
+    }).catch(() => { });
+  }
+}, [coverages, currentStep]);
