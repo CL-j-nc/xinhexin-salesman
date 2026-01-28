@@ -1,19 +1,7 @@
 name = "xinhexin-salesman"
 compatibility_date = "2024-05-01"
-pages_build_output_dir = "dist"
 
-[[kv_namespaces]]
-binding = "KV_BINDING"
-id = "893ca20cf01c42d894ec2977f73710df"
-# 创建 KV 命令：npx wrangler kv:namespace create "KV_BINDING"
-
-[build]
-command = "npm run build"
-
-# 生产环境配置
 [env.production]
-name = "xinhexin-salesman-production"
-
-# 预发布环境配置
-[env.staging]
-name = "xinhexin-salesman-staging"
+kv_namespaces = [
+  { binding = "KV_BINDING", id = "893ca20cf01c42d894ec2977f73710df" }
+]
