@@ -22,6 +22,7 @@ interface ApplicationData {
     inspectionDate: string;
     displacement: string;
     seats: string;
+    energyType: "FUEL" | "NEV";  // 与 ApplyForm 保持一致
     licenseImage: string;
   };
   owner: any;
