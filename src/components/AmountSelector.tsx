@@ -1,45 +1,54 @@
 import React from "react";
 import { cn } from "../utils/cn";
 
-interface DocumentTypePopupProps {
+interface AmountSelectorProps {
   visible: boolean;
   onClose: () => void;
-  onSelect: (type: string) => void;
-  currentValue?: string;
+  type: string;
+  currentAmount?: number;
+  onSelect: (amount: number) => void;
 }
 
-/**
- * 证件类型选择器
- * 
- * 纯UI组件：仅负责证件类型选择
- * 
- * 常见证件类型：
- * - 居民身份证
- * - 护照
- * - 军官证
- * - 港澳台居民居住证
- * - 统一社会信用代码
- */
-const DocumentTypePopup: React.FC<DocumentTypePopupProps> = ({
+const AmountSelector: React.FC<AmountSelectorProps> = ({
   visible,
   onClose,
+  type,
+  currentAmount,
   onSelect,
-  currentValue,
 }) => {
   if (!visible) return null;
 
-  const documentTypes = [
-    "居民身份证",
-    "护照",
-    "军官证",
-    "士兵证",
-    "港澳居民来往内地通行证",
-    "台湾居民来往大陆通行证",
-    "港澳台居民居住证",
-    "外国人永久居留身份证",
-    "统一社会信用代码",
-    "营业执照",
-  ];
+  // 根据类型定义可选金额
+  const getAmountOptions = () => {
+    if (type === "third_party") {
+      // 三者险金额选项
+      return [
+        { value: 500000, label: "50万" },
+        { value: 1000000, label: "100万" },
+        { value: 2000000, label: "200万" },
+        { value: 3000000, label: "300万" },
+        { value: 5000000, label: "500万" },
+        { value: 8000000, label: "800万" },
+        { value: 10000000, label: "1000万" },
+      ];
+    } else if (type === "driver" || type === "passenger") {
+      // 驾乘险金额选项
+      return [
+        { value: 10000, label: "1万" },
+        { value: 20000, label: "2万" },
+        { value: 30000, label: "3万" },
+        { value: 50000, label: "5万" },
+        { value: 100000, label: "10万" },
+        { value: 200000, label: "20万" },
+        { value: 300000, label: "30万" },
+        { value: 400000, label: "40万" },
+        { value: 500000, label: "50万" },
+      ];
+    }
+    return [];
+  };
+
+  const options = getAmountOptions();
 
   return (
     <div className="fixed inset-0 z-50 flex items-end">
@@ -53,7 +62,7 @@ const DocumentTypePopup: React.FC<DocumentTypePopupProps> = ({
       <div className="relative w-full bg-white rounded-t-2xl shadow-2xl animate-slide-up max-h-[70vh] overflow-y-auto">
         {/* Header */}
         <div className="sticky top-0 bg-white border-b border-gray-100 px-4 py-3 flex items-center justify-between z-10">
-          <h3 className="text-base font-bold text-gray-800">选择证件类型</h3>
+          <h3 className="text-base font-bold text-gray-800">选择保额</h3>
           <button
             type="button"
             onClick={onClose}
@@ -66,18 +75,18 @@ const DocumentTypePopup: React.FC<DocumentTypePopupProps> = ({
         {/* Content */}
         <div className="p-4">
           <div className="space-y-2">
-            {documentTypes.map((type) => (
+            {options.map((option) => (
               <button
-                key={type}
+                key={option.value}
                 type="button"
                 onClick={() => {
-                  onSelect(type);
+                  onSelect(option.value);
                   onClose();
                 }}
                 className={cn(
                   "w-full p-4 rounded-xl text-left transition-all duration-200",
                   "border hover:border-emerald-200 hover:bg-emerald-50",
-                  currentValue === type
+                  currentAmount === option.value
                     ? "bg-emerald-100 border-emerald-300"
                     : "bg-white border-gray-200"
                 )}
@@ -85,15 +94,15 @@ const DocumentTypePopup: React.FC<DocumentTypePopupProps> = ({
                 <div className="flex items-center justify-between">
                   <span
                     className={cn(
-                      "text-sm font-medium",
-                      currentValue === type
+                      "text-base font-medium",
+                      currentAmount === option.value
                         ? "text-emerald-700"
                         : "text-gray-800"
                     )}
                   >
-                    {type}
+                    {option.label}
                   </span>
-                  {currentValue === type && (
+                  {currentAmount === option.value && (
                     <div className="w-5 h-5 bg-emerald-500 rounded-full flex items-center justify-center">
                       <svg
                         className="w-3 h-3 text-white"
@@ -144,4 +153,4 @@ const DocumentTypePopup: React.FC<DocumentTypePopupProps> = ({
   );
 };
 
-export default DocumentTypePopup;
+export default AmountSelector;
