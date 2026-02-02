@@ -1047,18 +1047,6 @@ const ApplyForm: React.FC = () => {
         }}
         currentValue={vehicle.useNature}
       />
-
-      <CRMCustomerPicker
-        visible={showCRMCustomerPicker}
-        onClose={() => setShowCRMCustomerPicker(false)}
-        onSelect={handleSelectCustomer}
-      />
-
-      <CRMVehiclePicker
-        visible={showCRMVehiclePicker}
-        onClose={() => setShowCRMVehiclePicker(false)}
-        onSelect={handleSelectVehicle}
-      />
     </div>
   );
 };

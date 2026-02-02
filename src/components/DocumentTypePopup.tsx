@@ -140,7 +140,7 @@ const DocumentTypePopup: React.FC<DocumentTypePopupProps> = ({
           animation: slide-up 0.3s ease-out;
         }
       `}</style>
-    </div>
+    </div >
   );
 };
 
