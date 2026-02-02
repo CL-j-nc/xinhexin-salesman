@@ -56,6 +56,23 @@ export interface CRMVehicle {
     usageCount: number;
     isFavorite: boolean;
     tags: string[];
+
+    // 保单信息（可选）
+    policyInfo?: {
+        policyNo: string;
+        coverages: {
+            type: string;
+            name: string;
+            amount: number;
+            premium: number;
+        }[];
+        applyTime: string;
+        paymentTime?: string;
+        status: "APPLIED" | "APPROVED" | "PAID" | "ISSUED" | "REJECTED";
+        ownerName: string;
+        ownerIdCard: string;
+        ownerPhone: string;
+    };
 }
 
 const CUSTOMERS_KEY = "crm_customers";
