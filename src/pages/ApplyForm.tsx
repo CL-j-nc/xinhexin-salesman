@@ -166,12 +166,14 @@ const ApplyForm: React.FC = () => {
       setVehicle(prev => ({ ...prev, energyType: stored }));
       initializeCoverages(stored);
     } else {
-      navigate("/");
+      // 默认使用 FUEL，不跳转
+      setEnergyType("FUEL");
+      initializeCoverages("FUEL");
     }
 
     // 初始化 CRM 预置数据（仅首次）
     initializeCRMData(mockCustomers, mockVehicles);
-  }, [navigate]);
+  }, []);
 
   const initializeCoverages = (type: EnergyType) => {
     const isNEV = type === "NEV";
@@ -330,29 +332,51 @@ const ApplyForm: React.FC = () => {
     }
   };
 
-  // ==================== 核心提交逻辑：只调用 /api/save ====================
+  // ==================== 核心提交逻辑：调用 /api/application/apply ====================
   const handleSubmit = async () => {
     setSubmitting(true);
     try {
-      const response = await fetch("/api/save", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          energyType,
-          vehicle,
-          owner,
-          proposer,
-          insured,
-          coverages: coverages.filter(c => c.selected),
-        }),
+      const applicationData = {
+        energyType,
+        vehicle,
+        owner,
+        proposer,
+        insured,
+        coverages: coverages.filter(c => c.selected),
+      };
+
+      // 首先尝试调用 API
+      try {
+        const response = await fetch("/api/application/apply", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(applicationData),
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          // 存储 application ID 并跳转到状态页
+          sessionStorage.setItem("applicationId", result.requestId || result.applicationNo);
+          navigate("/status");
+          return;
+        }
+      } catch (apiError) {
+        console.log("API不可用，使用本地存储模式");
+      }
+
+      // 降级到本地存储模式
+      const localId = `LOCAL-${Date.now()}`;
+      const existingApps = JSON.parse(localStorage.getItem("insurance_applications") || "[]");
+      existingApps.push({
+        id: localId,
+        timestamp: Date.now(),
+        status: "APPLIED",
+        ...applicationData,
       });
+      localStorage.setItem("insurance_applications", JSON.stringify(existingApps));
 
-      if (!response.ok) throw new Error("提交失败");
-
-      const result = await response.json();
-
-      // 存储application ID并跳转到状态页
-      sessionStorage.setItem("applicationId", result.id);
+      sessionStorage.setItem("applicationId", localId);
+      alert("投保申请已保存到本地（离线模式）");
       navigate("/status");
     } catch (error: any) {
       alert(error.message || "提交失败，请重试");
