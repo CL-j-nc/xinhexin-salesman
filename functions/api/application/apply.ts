@@ -30,30 +30,39 @@ export async function onRequestPost({ request, env }: { request: Request; env: E
             expirationTtl: 86400,
         });
 
-        // 3. 持久化到 D1 数据库 (正式业务存储)
-        await env.DB.prepare(
-            `INSERT INTO application (
-        application_no, 
-        request_id, 
-        energy_type, 
-        vehicle_data, 
-        owner_data, 
-        proposer_data, 
-        insured_data, 
-        coverages_data, 
-        status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-        ).bind(
-            applicationNo,
-            requestId,
-            data.vehicle?.energyType || 'FUEL',
-            JSON.stringify(data.vehicle || {}),
-            JSON.stringify(data.owner || {}),
-            JSON.stringify(data.proposer || {}),
-            JSON.stringify(data.insured || {}),
-            JSON.stringify(data.coverages || []),
-            "APPLIED"
-        ).run();
+        // 3. 持久化到 D1 数据库 (可选，如果绑定了 DB 则执行)
+        if (env.DB) {
+            try {
+                await env.DB.prepare(
+                    `INSERT INTO application (
+                    application_no, 
+                    request_id, 
+                    energy_type, 
+                    vehicle_data, 
+                    owner_data, 
+                    proposer_data, 
+                    insured_data, 
+                    coverages_data, 
+                    status
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+                ).bind(
+                    applicationNo,
+                    requestId,
+                    data.vehicle?.energyType || 'FUEL',
+                    JSON.stringify(data.vehicle || {}),
+                    JSON.stringify(data.owner || {}),
+                    JSON.stringify(data.proposer || {}),
+                    JSON.stringify(data.insured || {}),
+                    JSON.stringify(data.coverages || []),
+                    "APPLIED"
+                ).run();
+            } catch (dbError: any) {
+                console.error("D1 Database error:", dbError.message);
+                // 继续执行，因为 KV 已经保存了数据，不影响用户前端流程
+            }
+        } else {
+            console.warn("D1 Database binding 'DB' is missing. Data only saved to KV.");
+        }
 
         return new Response(JSON.stringify({ success: true, requestId, applicationNo }), {
             status: 200,
@@ -63,6 +72,7 @@ export async function onRequestPost({ request, env }: { request: Request; env: E
             },
         });
     } catch (error: any) {
+        console.error("Application apply error:", error.message);
         return new Response(JSON.stringify({ error: error.message || "提交失败" }), {
             status: 500,
             headers: {
