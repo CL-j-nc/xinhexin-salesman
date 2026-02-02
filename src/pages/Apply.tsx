@@ -1,10 +1,12 @@
-import React from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { cn } from "../utils/cn";
 import HomeHeader from "../components/HomeHeader";
+import CRMExportImport from "../components/CRMExportImport";
 
 const Apply: React.FC = () => {
   const navigate = useNavigate();
+  const [showExportImport, setShowExportImport] = useState(false);
 
   const handleEnergySelection = (energyType: "NEV" | "FUEL") => {
     sessionStorage.setItem("energyType", energyType);
@@ -158,42 +160,56 @@ const Apply: React.FC = () => {
               </div>
             </div>
 
-            {/* System Permissions Placeholder */}
+            {/* CRM Data Management */}
             <div
+              onClick={() => setShowExportImport(true)}
+              role="button"
+              tabIndex={0}
               className={cn(
                 "module-glow module-glow-slate",
-                "bg-gradient-to-br from-slate-50 to-white rounded-2xl p-8 shadow-md border-2 border-slate-200",
-                "opacity-60 cursor-not-allowed"
+                "bg-gradient-to-br from-amber-50 to-white rounded-2xl p-8 shadow-md border-2 border-amber-200",
+                "cursor-pointer hover:shadow-lg hover:-translate-y-1 transition-all duration-300",
+                "active:scale-[0.98]"
               )}
             >
               <div className="flex items-center gap-3 mb-3">
-                {/* Geometric Shield Icon - Line Art Style */}
-                <svg width="48" height="48" viewBox="0 0 48 48" fill="none" className="text-slate-400">
+                <svg width="48" height="48" viewBox="0 0 48 48" fill="none" className="text-amber-500">
                   <path
-                    d="M24 6L10 12v10c0 8.8 6 17 14 20 8-3 14-11.2 14-20V12L24 6z"
+                    d="M12 8h24a2 2 0 012 2v28a2 2 0 01-2 2H12a2 2 0 01-2-2V10a2 2 0 012-2z"
                     stroke="currentColor"
                     strokeWidth="2.5"
                     strokeLinecap="round"
-                    strokeLinejoin="round"
                   />
                   <path
-                    d="M16 24l4 4 8-8"
+                    d="M16 16h16M16 24h16M16 32h10"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                  />
+                  <path
+                    d="M30 28l4 4-4 4"
                     stroke="currentColor"
                     strokeWidth="2"
                     strokeLinecap="round"
                     strokeLinejoin="round"
                   />
                 </svg>
-                <h3 className="text-xl font-bold text-slate-400">系统权限</h3>
+                <h3 className="text-xl font-bold text-slate-700">CRM 数据管理</h3>
               </div>
-              <p className="text-sm text-slate-400 leading-relaxed pl-1">
-                管理员功能入口
+              <p className="text-sm text-slate-500 leading-relaxed pl-1">
+                导入/导出车辆客户档案
               </p>
             </div>
           </div>
         </div>
 
       </div>
+
+      {/* CRM Export/Import Modal */}
+      <CRMExportImport
+        visible={showExportImport}
+        onClose={() => setShowExportImport(false)}
+      />
     </div>
   );
 };
