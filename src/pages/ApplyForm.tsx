@@ -332,6 +332,18 @@ const ApplyForm: React.FC = () => {
     }
   };
 
+  const handlePrev = () => {
+    if (currentStep === "owner") {
+      setCurrentStep("vehicle");
+    } else if (currentStep === "proposer") {
+      setCurrentStep("owner");
+    } else if (currentStep === "insured") {
+      setCurrentStep("proposer");
+    } else if (currentStep === "coverages") {
+      setCurrentStep("insured");
+    }
+  };
+
   // ==================== 核心提交逻辑：调用 /api/application/apply ====================
   const handleSubmit = async () => {
     setSubmitting(true);
@@ -1004,20 +1016,32 @@ const ApplyForm: React.FC = () => {
       </main>
 
       <div className="sticky bottom-0 w-full bg-white border-t border-gray-200 p-4">
-        <button
-          type="button"
-          onClick={handleNext}
-          disabled={submitting}
-          className={cn(
-            "w-full py-3.5 rounded-xl text-white font-bold shadow-lg transition-all active:scale-[0.98]",
-            isNEV
-              ? "bg-gradient-to-r from-emerald-500 to-emerald-600"
-              : "bg-emerald-500",
-            submitting && "opacity-50 cursor-not-allowed"
+        <div className="flex gap-3">
+          {currentStep !== "vehicle" && (
+            <button
+              type="button"
+              onClick={handlePrev}
+              className="flex-1 py-3.5 rounded-xl font-bold border-2 border-gray-300 text-gray-600 hover:bg-gray-50 transition-all active:scale-[0.98]"
+            >
+              上一步
+            </button>
           )}
-        >
-          {submitting ? "提交中..." : currentStep === "coverages" ? "提交投保" : "下一步"}
-        </button>
+          <button
+            type="button"
+            onClick={handleNext}
+            disabled={submitting}
+            className={cn(
+              "flex-1 py-3.5 rounded-xl text-white font-bold shadow-lg transition-all active:scale-[0.98]",
+              isNEV
+                ? "bg-gradient-to-r from-emerald-500 to-emerald-600"
+                : "bg-emerald-500",
+              submitting && "opacity-50 cursor-not-allowed",
+              currentStep === "vehicle" && "flex-[2]"
+            )}
+          >
+            {submitting ? "提交中..." : currentStep === "coverages" ? "提交投保" : "下一步"}
+          </button>
+        </div>
       </div>
 
       <DocumentTypePopup
