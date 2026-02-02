@@ -3,6 +3,7 @@
 
 interface Env {
     POLICY_KV: KVNamespace;
+    DB: D1Database;
 }
 
 export async function onRequestPost({ request, env }: { request: Request; env: Env }) {
@@ -19,15 +20,40 @@ export async function onRequestPost({ request, env }: { request: Request; env: E
             createdAt: new Date().toISOString(),
         };
 
-        // 存储到 KV，30天过期
+        // 1. 存储到 KV，30天过期 (用于快速状态查询)
         await env.POLICY_KV.put(applicationNo, JSON.stringify(payload), {
             expirationTtl: 2592000,
         });
 
-        // RequestId 映射到 ApplicationNo
+        // 2. RequestId 映射到 ApplicationNo
         await env.POLICY_KV.put(`request:${requestId}`, applicationNo, {
             expirationTtl: 86400,
         });
+
+        // 3. 持久化到 D1 数据库 (正式业务存储)
+        await env.DB.prepare(
+            `INSERT INTO application (
+        application_no, 
+        request_id, 
+        energy_type, 
+        vehicle_data, 
+        owner_data, 
+        proposer_data, 
+        insured_data, 
+        coverages_data, 
+        status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        ).bind(
+            applicationNo,
+            requestId,
+            data.vehicle?.energyType || 'FUEL',
+            JSON.stringify(data.vehicle || {}),
+            JSON.stringify(data.owner || {}),
+            JSON.stringify(data.proposer || {}),
+            JSON.stringify(data.insured || {}),
+            JSON.stringify(data.coverages || []),
+            "APPLIED"
+        ).run();
 
         return new Response(JSON.stringify({ success: true, requestId, applicationNo }), {
             status: 200,
