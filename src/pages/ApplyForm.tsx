@@ -42,7 +42,8 @@ interface VehicleInfo {
   vehicleType: string;
   owner: string;
   inspectionDate: string;
-  displacement: string;
+  curbWeight: string; // 整备质量
+  approvedLoad: string; // 核定载质量
   seats: string;
   energyType: EnergyType;
   licenseImage: string;
@@ -79,7 +80,8 @@ const ApplyForm: React.FC = () => {
     vehicleType: "客车",
     owner: "",
     inspectionDate: "",
-    displacement: "",
+    curbWeight: "",
+    approvedLoad: "",
     seats: "",
     energyType: "FUEL",
     licenseImage: "",
@@ -162,7 +164,7 @@ const ApplyForm: React.FC = () => {
   const initializeCoverages = (type: EnergyType) => {
     const isNEV = type === "NEV";
     const prefix = isNEV ? "新能源汽车" : "机动车";
-    
+
     const baseCoverages: CoverageItem[] = [
       {
         type: "damage",
@@ -198,12 +200,12 @@ const ApplyForm: React.FC = () => {
 
   useEffect(() => {
     if (!energyType) return;
-    
+
     const isNEV = energyType === "NEV";
     const prefix = isNEV ? "新能源汽车" : "机动车";
-    
+
     let newCoverages = [...coverages.filter(c => !c.parentType)];
-    
+
     const damageSelected = coverages.find(c => c.type === "damage")?.selected;
     if (damageSelected && isNEV) {
       const hasExternalGrid = newCoverages.find(c => c.type === "external_grid");
@@ -215,7 +217,7 @@ const ApplyForm: React.FC = () => {
           parentType: "damage",
         });
       }
-      
+
       const hasRescue = newCoverages.find(c => c.type === "rescue");
       if (!hasRescue) {
         newCoverages.push({
@@ -225,7 +227,7 @@ const ApplyForm: React.FC = () => {
           parentType: "damage",
         });
       }
-      
+
       const hasInspection = newCoverages.find(c => c.type === "inspection");
       if (!hasInspection) {
         newCoverages.push({
@@ -236,7 +238,7 @@ const ApplyForm: React.FC = () => {
         });
       }
     }
-    
+
     const thirdPartySelected = coverages.find(c => c.type === "third_party")?.selected;
     if (thirdPartySelected) {
       const hasMedical = newCoverages.find(c => c.type === "third_party_medical");
@@ -249,7 +251,7 @@ const ApplyForm: React.FC = () => {
         });
       }
     }
-    
+
     const driverSelected = coverages.find(c => c.type === "driver")?.selected;
     if (driverSelected) {
       const hasDriverMedical = newCoverages.find(c => c.type === "driver_medical");
@@ -262,7 +264,7 @@ const ApplyForm: React.FC = () => {
         });
       }
     }
-    
+
     const passengerSelected = coverages.find(c => c.type === "passenger")?.selected;
     if (passengerSelected) {
       const hasPassengerMedical = newCoverages.find(c => c.type === "passenger_medical");
@@ -275,7 +277,7 @@ const ApplyForm: React.FC = () => {
         });
       }
     }
-    
+
     setCoverages(newCoverages);
   }, [coverages.map(c => `${c.type}:${c.selected}`).join(","), energyType]);
 
@@ -336,7 +338,7 @@ const ApplyForm: React.FC = () => {
       if (!response.ok) throw new Error("提交失败");
 
       const result = await response.json();
-      
+
       // 存储application ID并跳转到状态页
       sessionStorage.setItem("applicationId", result.id);
       navigate("/status");
@@ -366,10 +368,14 @@ const ApplyForm: React.FC = () => {
   };
 
   return (
-    <div className={cn("min-h-screen pb-24", isNEV ? "bg-gradient-to-b from-emerald-50 to-white" : "bg-gray-50")}>
+    <div className={cn(
+      "min-h-screen pb-24",
+      isNEV
+        ? "bg-gradient-to-t from-emerald-500/30 via-emerald-500/10 to-transparent"  // 新能源：从下到上渐变（人寿绿→透明）
+        : "bg-gray-50"  // 燃油车：保持不变
+    )}>
       <Header
-        energyType={energyType}
-        title={isNEV ? "新能源汽车承保" : "机动车承保"}
+        title="新核心车险承保信息页面"
         showBackButton
         onBackClick={() => navigate("/")}
       />
@@ -402,8 +408,8 @@ const ApplyForm: React.FC = () => {
                         ? "bg-emerald-500 text-white"
                         : "bg-emerald-500 text-white"
                       : steps.findIndex(s => s.id === currentStep) > index
-                      ? "bg-emerald-100 text-emerald-600"
-                      : "bg-gray-200 text-gray-400"
+                        ? "bg-emerald-100 text-emerald-600"
+                        : "bg-gray-200 text-gray-400"
                   )}
                 >
                   {index + 1}
@@ -529,11 +535,21 @@ const ApplyForm: React.FC = () => {
               </div>
 
               <div className="flex items-center justify-between border-b border-gray-100 py-3">
-                <span className="text-sm text-gray-500">排量(ml)</span>
+                <span className="text-sm text-gray-500">整备质量(kg)</span>
                 <input
-                  value={vehicle.displacement}
-                  onChange={e => setVehicle({ ...vehicle, displacement: e.target.value })}
-                  placeholder="请输入排量"
+                  value={vehicle.curbWeight}
+                  onChange={e => setVehicle({ ...vehicle, curbWeight: e.target.value })}
+                  placeholder="请输入整备质量"
+                  className="text-right text-sm outline-none flex-1 ml-4"
+                />
+              </div>
+
+              <div className="flex items-center justify-between border-b border-gray-100 py-3">
+                <span className="text-sm text-gray-500">核定载质量(kg)</span>
+                <input
+                  value={vehicle.approvedLoad}
+                  onChange={e => setVehicle({ ...vehicle, approvedLoad: e.target.value })}
+                  placeholder="请输入核定载质量"
                   className="text-right text-sm outline-none flex-1 ml-4"
                 />
               </div>
@@ -573,7 +589,7 @@ const ApplyForm: React.FC = () => {
         {/* 险种选择 - 完整表单省略，保持原有UI */}
       </main>
 
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4">
+      <div className="sticky bottom-0 w-full bg-white border-t border-gray-200 p-4">
         <button
           type="button"
           onClick={handleNext}
@@ -606,8 +622,8 @@ const ApplyForm: React.FC = () => {
           documentFor === "owner"
             ? owner.idType
             : documentFor === "proposer"
-            ? proposer.idType
-            : insured.idType
+              ? proposer.idType
+              : insured.idType
         }
       />
 

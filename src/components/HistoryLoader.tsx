@@ -20,7 +20,8 @@ interface ApplicationData {
     vehicleType: string;
     owner: string;
     inspectionDate: string;
-    displacement: string;
+    curbWeight: string;  // 整备质量
+    approvedLoad: string;  // 核定载质量
     seats: string;
     energyType: "FUEL" | "NEV";  // 与 ApplyForm 保持一致
     licenseImage: string;
@@ -78,7 +79,7 @@ const HistoryLoader: React.FC<HistoryLoaderProps> = ({
     try {
       const stored = localStorage.getItem("insurance_applications");
       if (!stored) return [];
-      
+
       const data = JSON.parse(stored);
       return Array.isArray(data) ? data : [];
     } catch (e) {
@@ -249,31 +250,31 @@ const HistoryLoader: React.FC<HistoryLoaderProps> = ({
                               item.status === "APPLIED"
                                 ? "bg-blue-100 text-blue-700"
                                 : item.status === "UI"
-                                ? "bg-blue-100 text-blue-700"
-                                : item.status === "UA"
-                                ? "bg-green-100 text-green-700"
-                                : item.status === "UR"
-                                ? "bg-red-100 text-red-700"
-                                : item.status === "PAID"
-                                ? "bg-green-100 text-green-700"
-                                : item.status === "ISSUED"
-                                ? "bg-green-100 text-green-700"
-                                : "bg-gray-100 text-gray-700"
+                                  ? "bg-blue-100 text-blue-700"
+                                  : item.status === "UA"
+                                    ? "bg-green-100 text-green-700"
+                                    : item.status === "UR"
+                                      ? "bg-red-100 text-red-700"
+                                      : item.status === "PAID"
+                                        ? "bg-green-100 text-green-700"
+                                        : item.status === "ISSUED"
+                                          ? "bg-green-100 text-green-700"
+                                          : "bg-gray-100 text-gray-700"
                             )}
                           >
                             {item.status === "APPLIED"
                               ? "核保中"
                               : item.status === "UI"
-                              ? "核保中"
-                              : item.status === "UA"
-                              ? "核保通过"
-                              : item.status === "UR"
-                              ? "退回修改"
-                              : item.status === "PAID"
-                              ? "已支付"
-                              : item.status === "ISSUED"
-                              ? "已承保"
-                              : item.status}
+                                ? "核保中"
+                                : item.status === "UA"
+                                  ? "核保通过"
+                                  : item.status === "UR"
+                                    ? "退回修改"
+                                    : item.status === "PAID"
+                                      ? "已支付"
+                                      : item.status === "ISSUED"
+                                        ? "已承保"
+                                        : item.status}
                           </span>
                         )}
                       </div>
