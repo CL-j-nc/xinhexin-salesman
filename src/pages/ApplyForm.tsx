@@ -451,6 +451,7 @@ const ApplyForm: React.FC = () => {
   };
 
   const handleSelectVehicle = (vehicleData: CRMVehicle) => {
+    // 更新车辆信息
     setVehicle({
       plate: vehicleData.plate,
       vin: vehicleData.vin,
@@ -469,6 +470,10 @@ const ApplyForm: React.FC = () => {
       energyType: vehicleData.energyType,
       licenseImage: "",
     });
+
+    // 根据车辆能源类型重新初始化险种
+    setEnergyType(vehicleData.energyType);
+    initializeCoverages(vehicleData.energyType);
   };
 
   return (
