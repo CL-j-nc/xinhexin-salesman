@@ -268,14 +268,17 @@ export const initializeCRMData = (customers: CRMCustomer[], vehicles: CRMVehicle
     const existingCustomers = getAllCustomers();
     const existingVehicles = getAllVehicles();
 
-    // 只在首次使用时初始化
-    if (existingCustomers.length === 0) {
-        localStorage.setItem(CUSTOMERS_KEY, JSON.stringify(customers));
-    }
+    // 合并客户数据（按ID去重，新数据优先）
+    const customerMap = new Map<string, CRMCustomer>();
+    existingCustomers.forEach(c => customerMap.set(c.id, c));
+    customers.forEach(c => customerMap.set(c.id, c)); // 新数据覆盖旧数据
+    localStorage.setItem(CUSTOMERS_KEY, JSON.stringify(Array.from(customerMap.values())));
 
-    if (existingVehicles.length === 0) {
-        localStorage.setItem(VEHICLES_KEY, JSON.stringify(vehicles));
-    }
+    // 合并车辆数据（按ID去重，新数据优先）
+    const vehicleMap = new Map<string, CRMVehicle>();
+    existingVehicles.forEach(v => vehicleMap.set(v.id, v));
+    vehicles.forEach(v => vehicleMap.set(v.id, v)); // 新数据覆盖旧数据
+    localStorage.setItem(VEHICLES_KEY, JSON.stringify(Array.from(vehicleMap.values())));
 };
 
 export const clearAllCRMData = (): void => {
