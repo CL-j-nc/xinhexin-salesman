@@ -170,14 +170,41 @@ class DatabaseSource implements CRMDataSource {
     }
 
     async getVehicleProfile(plateOrVin: string): Promise<VehicleProfile | null> {
-        const response = await fetch(`${this.baseUrl}/api/crm/vehicle/${encodeURIComponent(plateOrVin)}`);
+        // 使用规范路径 /api/crm/by-vehicle
+        const response = await fetch(`${this.baseUrl}/api/crm/by-vehicle?plate=${encodeURIComponent(plateOrVin)}`);
         if (response.status === 404) return null;
         if (!response.ok) throw new Error("Database query failed");
-        return response.json();
+        const data = await response.json();
+        if (!data || !data.vehicle_policy_uid) return null;
+        // 转换snake_case到camelCase
+        return {
+            vehiclePolicyUid: data.vehicle_policy_uid,
+            plate: data.plate,
+            vin: data.vin,
+            currentStatus: data.current_status || "ACTIVE",
+            lastContactTime: data.last_contact_time,
+            contacts: (data.contacts || []).map((c: any) => ({
+                contactId: c.contact_id,
+                roleType: c.role_type,
+                name: c.name,
+                idType: c.id_type,
+                idNo: c.id_no,
+                phone: c.phone
+            })),
+            flags: (data.flags || []).map((f: any) => ({
+                flagId: f.flag_id,
+                flagType: f.flag_type,
+                flagNote: f.flag_note,
+                isActive: f.is_active === 1,
+                createdAt: f.created_at,
+                createdBy: f.created_by
+            }))
+        };
     }
 
     async getTimeline(vehicleUid: string): Promise<TimelineEvent[]> {
-        const response = await fetch(`${this.baseUrl}/api/crm/vehicle/${vehicleUid}/timeline`);
+        // 使用规范路径 /api/crm/timeline
+        const response = await fetch(`${this.baseUrl}/api/crm/timeline?vehicle_policy_uid=${vehicleUid}`);
         if (!response.ok) throw new Error("Database query failed");
         return response.json();
     }
@@ -189,10 +216,18 @@ class DatabaseSource implements CRMDataSource {
     }
 
     async addInteraction(interaction: InteractionInput): Promise<Interaction> {
-        const response = await fetch(`${this.baseUrl}/api/crm/interactions`, {
+        // 使用规范路径 /api/crm/interaction/add
+        const response = await fetch(`${this.baseUrl}/api/crm/interaction/add`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(interaction),
+            body: JSON.stringify({
+                vehicle_policy_uid: interaction.vehiclePolicyUid,
+                contact_method: interaction.contactMethod,
+                topic: interaction.topic,
+                result: interaction.result,
+                follow_up_status: interaction.followUpStatus,
+                operator_name: interaction.operatorName
+            }),
         });
         if (!response.ok) throw new Error("Failed to add interaction");
         return response.json();
@@ -205,10 +240,16 @@ class DatabaseSource implements CRMDataSource {
     }
 
     async addFlag(flag: FlagInput): Promise<Flag> {
-        const response = await fetch(`${this.baseUrl}/api/crm/flags`, {
+        // 使用规范路径 /api/crm/flag/add
+        const response = await fetch(`${this.baseUrl}/api/crm/flag/add`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(flag),
+            body: JSON.stringify({
+                vehicle_policy_uid: flag.vehiclePolicyUid,
+                flag_type: flag.flagType,
+                flag_note: flag.flagNote,
+                created_by: flag.createdBy
+            }),
         });
         if (!response.ok) throw new Error("Failed to add flag");
         return response.json();
