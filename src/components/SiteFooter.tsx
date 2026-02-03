@@ -12,7 +12,14 @@ const SiteFooter: React.FC = () => {
         <div className="site-footer-records">
           <span>京ICP备12041987号</span>
           <span className="site-footer-sep" aria-hidden="true" />
-          <span>京公网安备 11010202010565号</span>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}>
+            <img
+              src="/gongan-logo.png"
+              alt="公安徽标"
+              style={{ width: "14px", height: "14px" }}
+            />
+            京公网安备 11010202010565号
+          </span>
         </div>
       </div>
     </footer>
