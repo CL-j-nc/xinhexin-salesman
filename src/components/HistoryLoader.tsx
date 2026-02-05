@@ -45,12 +45,13 @@ interface HistoryLoaderProps {
  * 
  * 组件定位：
  * - 纯前端数据引用组件
- * - 仅负责读取历史投保数据
+ * - 仅负责读取历史投保数据（通过 API）
  * - 将历史数据填充回 ApplyForm 表单
  * 
- * 数据来源（按优先级）：
- * 1. 通过 applicationId 从接口获取：GET /api/application/detail?id=xxx
- * 2. 从 localStorage 读取历史缓存
+ * 数据来源：
+ * - 唯一来源：通过 API 从 Cloudflare D1 获取
+ * - GET /api/application/detail?id=xxx 获取单个投保详情
+ * - GET /api/application/history 获取历史投保列表
  * 
  * 使用场景：
  * - 核保退回（UR）后的再次修改投保
@@ -62,6 +63,7 @@ interface HistoryLoaderProps {
  * - ❌ 不允许触发 underwriting / 核保
  * - ❌ 不允许在组件内做业务判断
  * - ❌ 不允许写 KV / Worker
+ * - ❌ 不允许使用 localStorage / sessionStorage
  */
 const HistoryLoader: React.FC<HistoryLoaderProps> = ({
   visible,
@@ -73,20 +75,6 @@ const HistoryLoader: React.FC<HistoryLoaderProps> = ({
   const [historyList, setHistoryList] = useState<ApplicationData[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-
-  // 从 localStorage 获取历史记录
-  const loadFromLocalStorage = (): ApplicationData[] => {
-    try {
-      const stored = localStorage.getItem("insurance_applications");
-      if (!stored) return [];
-
-      const data = JSON.parse(stored);
-      return Array.isArray(data) ? data : [];
-    } catch (e) {
-      console.error("读取历史记录失败:", e);
-      return [];
-    }
-  };
 
   // 从接口获取指定投保单详情
   const loadFromAPI = async (id: string): Promise<ApplicationData | null> => {
@@ -108,6 +96,26 @@ const HistoryLoader: React.FC<HistoryLoaderProps> = ({
     }
   };
 
+  // 从接口获取历史投保列表
+  const loadHistoryList = async (): Promise<ApplicationData[]> => {
+    try {
+      const response = await fetch(`/api/application/history`, {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+      });
+
+      if (!response.ok) {
+        throw new Error("获取历史投保列表失败");
+      }
+
+      const data = await response.json();
+      return Array.isArray(data) ? data : [];
+    } catch (e: any) {
+      console.error("从接口获取历史投保列表失败:", e);
+      return [];
+    }
+  };
+
   // 加载历史记录
   useEffect(() => {
     if (!visible) return;
@@ -117,30 +125,22 @@ const HistoryLoader: React.FC<HistoryLoaderProps> = ({
       setError(null);
 
       try {
-        // 优先级1：如果提供了 applicationId，从接口获取
+        // 如果提供了 applicationId，从接口获取单个详情
         if (applicationId) {
           const apiData = await loadFromAPI(applicationId);
           if (apiData) {
             setHistoryList([apiData]);
             setSelectedId(apiData.id);
           } else {
-            // 接口失败，降级到 localStorage
-            const localData = loadFromLocalStorage();
-            const matchedData = localData.find(item => item.id === applicationId);
-            if (matchedData) {
-              setHistoryList([matchedData]);
-              setSelectedId(matchedData.id);
-            } else {
-              setError("未找到对应的投保记录");
-            }
+            setError("未找到对应的投保记录");
           }
         } else {
-          // 优先级2：从 localStorage 获取所有历史记录
-          const localData = loadFromLocalStorage();
-          if (localData.length === 0) {
+          // 从 API 获取所有历史记录
+          const historyData = await loadHistoryList();
+          if (historyData.length === 0) {
             setError("暂无历史投保记录");
           } else {
-            setHistoryList(localData);
+            setHistoryList(historyData);
           }
         }
       } catch (e: any) {

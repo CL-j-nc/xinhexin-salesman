@@ -1,18 +1,19 @@
 /**
  * CRM 数据导入导出工具
  * 支持 CSV 格式的车辆数据导入导出
+ * 所有数据通过 API 存取，不使用 localStorage
  */
 
 import type { CRMVehicle, CRMCustomer } from "./crmStorage";
-import { getAllVehicles, getAllCustomers } from "./crmStorage";
+import { crmDataSource } from "./crmDataSource";
 
 // ==================== 导出功能 ====================
 
 /**
  * 将车辆数据导出为 CSV 格式
  */
-export const exportVehiclesToCSV = (): string => {
-    const vehicles = getAllVehicles();
+export const exportVehiclesToCSV = async (): Promise<string> => {
+    const vehicles = await crmDataSource.getAllVehicles();
 
     // CSV 表头
     const headers = [
@@ -70,8 +71,8 @@ export const exportVehiclesToCSV = (): string => {
 /**
  * 将客户数据导出为 CSV 格式
  */
-export const exportCustomersToCSV = (): string => {
-    const customers = getAllCustomers();
+export const exportCustomersToCSV = async (): Promise<string> => {
+    const customers = await crmDataSource.getAllCustomers();
 
     const headers = [
         "ID",
@@ -135,8 +136,8 @@ export const downloadCSV = (content: string, filename: string): void => {
 /**
  * 导出车辆数据为 CSV 文件
  */
-export const downloadVehiclesCSV = (): void => {
-    const csv = exportVehiclesToCSV();
+export const downloadVehiclesCSV = async (): Promise<void> => {
+    const csv = await exportVehiclesToCSV();
     const date = new Date().toISOString().split("T")[0];
     downloadCSV(csv, `CRM车辆档案_${date}.csv`);
 };
@@ -144,8 +145,8 @@ export const downloadVehiclesCSV = (): void => {
 /**
  * 导出客户数据为 CSV 文件
  */
-export const downloadCustomersCSV = (): void => {
-    const csv = exportCustomersToCSV();
+export const downloadCustomersCSV = async (): Promise<void> => {
+    const csv = await exportCustomersToCSV();
     const date = new Date().toISOString().split("T")[0];
     downloadCSV(csv, `CRM客户档案_${date}.csv`);
 };
@@ -193,9 +194,9 @@ const parseCSV = (content: string): string[][] => {
 };
 
 /**
- * 从 CSV 导入车辆数据
+ * 从 CSV 导入车辆数据（通过 API 存储到 D1）
  */
-export const importVehiclesFromCSV = (csvContent: string): ImportResult => {
+export const importVehiclesFromCSV = async (csvContent: string): Promise<ImportResult> => {
     const result: ImportResult = { success: true, imported: 0, errors: [] };
 
     try {
@@ -227,7 +228,7 @@ export const importVehiclesFromCSV = (csvContent: string): ImportResult => {
             return { success: false, imported: 0, errors: ["CSV 缺少必要的列：车牌号、车架号"] };
         }
 
-        const vehicles: CRMVehicle[] = [];
+        const vehiclesToImport: Omit<CRMVehicle, "id" | "createdAt" | "usageCount">[] = [];
 
         dataRows.forEach((row, index) => {
             try {
@@ -236,8 +237,7 @@ export const importVehiclesFromCSV = (csvContent: string): ImportResult => {
                     return;
                 }
 
-                const vehicle: CRMVehicle = {
-                    id: `vehicle_import_${Date.now()}_${index}`,
+                const vehicle: Omit<CRMVehicle, "id" | "createdAt" | "usageCount"> = {
                     nickname: row[plateIdx],
                     plate: row[plateIdx],
                     vin: row[vinIdx],
@@ -251,24 +251,25 @@ export const importVehiclesFromCSV = (csvContent: string): ImportResult => {
                     approvedLoad: loadIdx !== -1 ? row[loadIdx] || "" : "",
                     seats: seatsIdx !== -1 ? row[seatsIdx] || "5" : "5",
                     energyType: energyIdx !== -1 && row[energyIdx]?.includes("新能源") ? "NEV" : "FUEL",
-                    createdAt: new Date().toISOString(),
-                    usageCount: 0,
                     isFavorite: false,
                     tags: ["导入数据"]
                 };
 
-                vehicles.push(vehicle);
-                result.imported++;
+                vehiclesToImport.push(vehicle);
             } catch (e: any) {
                 result.errors.push(`第 ${index + 2} 行解析失败：${e.message}`);
             }
         });
 
-        // 合并到现有数据
-        if (vehicles.length > 0) {
-            const existing = getAllVehicles();
-            const merged = [...existing, ...vehicles];
-            localStorage.setItem("crm_vehicles", JSON.stringify(merged));
+        // 批量通过 API 添加到 D1
+        if (vehiclesToImport.length > 0) {
+            try {
+                const imported = await crmDataSource.bulkAddVehicles(vehiclesToImport);
+                result.imported = imported.length;
+            } catch (e: any) {
+                result.errors.push(`批量导入失败：${e.message}`);
+                result.success = false;
+            }
         }
 
         result.success = result.errors.length === 0;
@@ -290,11 +291,11 @@ export const handleFileImport = (
 ): void => {
     const reader = new FileReader();
 
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
         const content = e.target?.result as string;
 
         if (type === "vehicles") {
-            const result = importVehiclesFromCSV(content);
+            const result = await importVehiclesFromCSV(content);
             callback(result);
         } else {
             // TODO: 实现客户导入

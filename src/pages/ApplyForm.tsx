@@ -9,8 +9,7 @@ import HistoryLoader from "../components/HistoryLoader";
 import UseNatureSelector from "../components/UseNatureSelector";
 import CRMCustomerPicker from "../components/CRMCustomerPicker";
 import CRMVehiclePicker from "../components/CRMVehiclePicker";
-import { initializeCRMData, type CRMCustomer, type CRMVehicle } from "../utils/crmStorage";
-import { mockCustomers, mockVehicles } from "../utils/mockCRMData";
+import type { CRMCustomer, CRMVehicle } from "../utils/crmStorage";
 
 type Step = "vehicle" | "owner" | "proposer" | "insured" | "coverages";
 
@@ -170,9 +169,7 @@ const ApplyForm: React.FC = () => {
       setEnergyType("FUEL");
       initializeCoverages("FUEL");
     }
-
-    // 初始化 CRM 预置数据（仅首次）
-    initializeCRMData(mockCustomers, mockVehicles);
+    // CRM数据现在通过API从D1数据库获取，不再使用localStorage预置
   }, []);
 
   const initializeCoverages = (type: EnergyType) => {

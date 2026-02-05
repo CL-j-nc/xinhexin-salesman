@@ -1,16 +1,4 @@
 import type { CRMCustomer, CRMVehicle } from "./crmStorage";
-import {
-    getAllCustomers,
-    getAllVehicles,
-    searchCustomers as searchLocalCustomers,
-    searchVehicles as searchLocalVehicles,
-    getCustomerById,
-    getVehicleById,
-    addCustomer as addLocalCustomer,
-    addVehicle as addLocalVehicle,
-    incrementCustomerUsage,
-    incrementVehicleUsage,
-} from "./crmStorage";
 
 // 扩展数据类型 - 生产环境专用
 export interface VehicleProfile {
@@ -103,7 +91,11 @@ export interface CRMDataSource {
     addFlag(flag: FlagInput): Promise<Flag>;
 }
 
-// 数据库数据源实现
+/**
+ * DatabaseSource - 唯一数据源实现
+ * 所有数据通过 Cloudflare D1 API 存取
+ * 不允许任何本地存储回退
+ */
 class DatabaseSource implements CRMDataSource {
     private baseUrl: string;
 
@@ -254,259 +246,37 @@ class DatabaseSource implements CRMDataSource {
         if (!response.ok) throw new Error("Failed to add flag");
         return response.json();
     }
-}
 
-// localStorage 数据源实现
-class LocalStorageSource implements CRMDataSource {
-    async searchCustomers(query: string): Promise<CRMCustomer[]> {
-        return Promise.resolve(searchLocalCustomers(query));
-    }
-
-    async getCustomer(id: string): Promise<CRMCustomer | null> {
-        return Promise.resolve(getCustomerById(id));
-    }
-
-    async addCustomer(customer: Omit<CRMCustomer, "id" | "createdAt" | "usageCount">): Promise<CRMCustomer> {
-        return Promise.resolve(addLocalCustomer(customer));
-    }
-
-    async updateCustomerUsage(id: string): Promise<void> {
-        incrementCustomerUsage(id);
-        return Promise.resolve();
-    }
-
-    async searchVehicles(query: string): Promise<CRMVehicle[]> {
-        return Promise.resolve(searchLocalVehicles(query));
-    }
-
-    async getVehicle(plateOrVin: string): Promise<CRMVehicle | null> {
-        const vehicles = getAllVehicles();
-        return Promise.resolve(
-            vehicles.find(v => v.plate === plateOrVin || v.vin === plateOrVin) || null
-        );
-    }
-    async addVehicle(vehicle: Omit<CRMVehicle, "id" | "createdAt" | "usageCount">): Promise<CRMVehicle> {
-        return Promise.resolve(addLocalVehicle(vehicle));
-    }
-
-    async updateVehicleUsage(id: string): Promise<void> {
-        incrementVehicleUsage(id);
-        return Promise.resolve();
-    }
-
-    // 生产功能在 localStorage 模式下返回空数据或模拟数据
-    async getVehicleProfile(plateOrVin: string): Promise<VehicleProfile | null> {
-        const vehicles = getAllVehicles();
-        const vehicle = vehicles.find(v => v.plate === plateOrVin || v.vin === plateOrVin);
-        if (!vehicle) return null;
-
-        // 模拟车辆档案
-        return {
-            vehiclePolicyUid: `mock_uid_${vehicle.plate}`,
-            plate: vehicle.plate,
-            vin: vehicle.vin,
-            currentStatus: "测试数据",
-            contacts: [],
-            flags: [],
-        };
-    }
-
-    async getTimeline(vehicleUid: string): Promise<TimelineEvent[]> {
-        // localStorage 模式下返回空时间轴
-        return Promise.resolve([]);
-    }
-
-    async getInteractions(vehicleUid: string): Promise<Interaction[]> {
-        // localStorage 模式下返回空沟通记录
-        return Promise.resolve([]);
-    }
-
-    async addInteraction(interaction: InteractionInput): Promise<Interaction> {
-        // localStorage 模式下模拟添加，但不持久化
-        return Promise.resolve({
-            interactionId: `mock_${Date.now()}`,
-            contactMethod: interaction.contactMethod,
-            topic: interaction.topic,
-            result: interaction.result,
-            followUpStatus: interaction.followUpStatus,
-            interactionTime: new Date().toISOString(),
-            operatorName: interaction.operatorName,
+    // 批量添加车辆（用于CSV导入）
+    async bulkAddVehicles(vehicles: Omit<CRMVehicle, "id" | "createdAt" | "usageCount">[]): Promise<CRMVehicle[]> {
+        const response = await fetch(`${this.baseUrl}/api/crm/vehicles/bulk`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ vehicles }),
         });
+        if (!response.ok) throw new Error("Failed to bulk add vehicles");
+        return response.json();
     }
 
-    async getFlags(vehicleUid: string): Promise<Flag[]> {
-        // localStorage 模式下返回空标记
-        return Promise.resolve([]);
+    // 获取所有车辆（用于CSV导出）
+    async getAllVehicles(): Promise<CRMVehicle[]> {
+        const response = await fetch(`${this.baseUrl}/api/crm/vehicles`);
+        if (!response.ok) throw new Error("Database query failed");
+        return response.json();
     }
 
-    async addFlag(flag: FlagInput): Promise<Flag> {
-        // localStorage 模式下模拟添加，但不持久化
-        return Promise.resolve({
-            flagId: `mock_${Date.now()}`,
-            flagType: flag.flagType,
-            flagNote: flag.flagNote,
-            isActive: true,
-            createdAt: new Date().toISOString(),
-            createdBy: flag.createdBy,
-        });
-    }
-}
-
-// 混合数据源（智能切换）
-class HybridDataSource implements CRMDataSource {
-    private dbSource: DatabaseSource;
-    private localSource: LocalStorageSource;
-    private useDatabaseMode: boolean = false;
-    private backendDetected: boolean = false;
-
-    constructor() {
-        this.dbSource = new DatabaseSource();
-        this.localSource = new LocalStorageSource();
-        this.detectBackend();
+    // 获取所有客户（用于CSV导出）
+    async getAllCustomers(): Promise<CRMCustomer[]> {
+        const response = await fetch(`${this.baseUrl}/api/crm/customers`);
+        if (!response.ok) throw new Error("Database query failed");
+        return response.json();
     }
 
-    private async detectBackend() {
-        try {
-            // 尝试访问健康检查端点
-            const response = await fetch("/api/health", { method: "HEAD" });
-            if (response.ok) {
-                this.useDatabaseMode = true;
-                this.backendDetected = true;
-                console.log("✅ CRM: Backend detected, using database mode");
-            } else {
-                this.fallbackToLocal();
-            }
-        } catch (error) {
-            this.fallbackToLocal();
-        }
-    }
-
-    private fallbackToLocal() {
-        this.useDatabaseMode = false;
-        this.backendDetected = false;
-        console.log("📦 CRM: Backend unavailable, using localStorage mode");
-    }
-
-    private async tryDatabase<T>(
-        dbOperation: () => Promise<T>,
-        localFallback: () => Promise<T>
-    ): Promise<T> {
-        if (!this.backendDetected) {
-            return localFallback();
-        }
-
-        try {
-            return await dbOperation();
-        } catch (error) {
-            console.warn("Database operation failed, falling back to localStorage:", error);
-            this.fallbackToLocal();
-            return localFallback();
-        }
-    }
-
-    async searchCustomers(query: string): Promise<CRMCustomer[]> {
-        return this.tryDatabase(
-            () => this.dbSource.searchCustomers(query),
-            () => this.localSource.searchCustomers(query)
-        );
-    }
-
-    async getCustomer(id: string): Promise<CRMCustomer | null> {
-        return this.tryDatabase(
-            () => this.dbSource.getCustomer(id),
-            () => this.localSource.getCustomer(id)
-        );
-    }
-
-    async addCustomer(customer: Omit<CRMCustomer, "id" | "createdAt" | "usageCount">): Promise<CRMCustomer> {
-        return this.tryDatabase(
-            () => this.dbSource.addCustomer(customer),
-            () => this.localSource.addCustomer(customer)
-        );
-    }
-
-    async updateCustomerUsage(id: string): Promise<void> {
-        return this.tryDatabase(
-            () => this.dbSource.updateCustomerUsage(id),
-            () => this.localSource.updateCustomerUsage(id)
-        );
-    }
-
-    async searchVehicles(query: string): Promise<CRMVehicle[]> {
-        return this.tryDatabase(
-            () => this.dbSource.searchVehicles(query),
-            () => this.localSource.searchVehicles(query)
-        );
-    }
-
-    async getVehicle(plateOrVin: string): Promise<CRMVehicle | null> {
-        return this.tryDatabase(
-            () => this.dbSource.getVehicle(plateOrVin),
-            () => this.localSource.getVehicle(plateOrVin)
-        );
-    }
-
-    async addVehicle(vehicle: Omit<CRMVehicle, "id" | "createdAt" | "usageCount">): Promise<CRMVehicle> {
-        return this.tryDatabase(
-            () => this.dbSource.addVehicle(vehicle),
-            () => this.localSource.addVehicle(vehicle)
-        );
-    }
-
-    async updateVehicleUsage(id: string): Promise<void> {
-        return this.tryDatabase(
-            () => this.dbSource.updateVehicleUsage(id),
-            () => this.localSource.updateVehicleUsage(id)
-        );
-    }
-
-    async getVehicleProfile(plateOrVin: string): Promise<VehicleProfile | null> {
-        return this.tryDatabase(
-            () => this.dbSource.getVehicleProfile(plateOrVin),
-            () => this.localSource.getVehicleProfile(plateOrVin)
-        );
-    }
-
-    async getTimeline(vehicleUid: string): Promise<TimelineEvent[]> {
-        return this.tryDatabase(
-            () => this.dbSource.getTimeline(vehicleUid),
-            () => this.localSource.getTimeline(vehicleUid)
-        );
-    }
-
-    async getInteractions(vehicleUid: string): Promise<Interaction[]> {
-        return this.tryDatabase(
-            () => this.dbSource.getInteractions(vehicleUid),
-            () => this.localSource.getInteractions(vehicleUid)
-        );
-    }
-
-    async addInteraction(interaction: InteractionInput): Promise<Interaction> {
-        return this.tryDatabase(
-            () => this.dbSource.addInteraction(interaction),
-            () => this.localSource.addInteraction(interaction)
-        );
-    }
-
-    async getFlags(vehicleUid: string): Promise<Flag[]> {
-        return this.tryDatabase(
-            () => this.dbSource.getFlags(vehicleUid),
-            () => this.localSource.getFlags(vehicleUid)
-        );
-    }
-
-    async addFlag(flag: FlagInput): Promise<Flag> {
-        return this.tryDatabase(
-            () => this.dbSource.addFlag(flag),
-            () => this.localSource.addFlag(flag)
-        );
-    }
-
-    // 工具方法：获取当前模式
-    getCurrentMode(): "database" | "localStorage" {
-        return this.backendDetected ? "database" : "localStorage";
+    // 工具方法：获取当前模式（始终为database）
+    getCurrentMode(): "database" {
+        return "database";
     }
 }
 
-// 导出单例
-export const crmDataSource = new HybridDataSource();
+// 导出单例 - 仅使用数据库源
+export const crmDataSource = new DatabaseSource();
