@@ -50,20 +50,9 @@ interface HistoryLoaderProps {
  * 
  * 数据来源：
  * - 唯一来源：通过 API 从 Cloudflare D1 获取
- * - GET /api/application/detail?id=xxx 获取单个投保详情
- * - GET /api/application/history 获取历史投保列表
- * 
- * 使用场景：
- * - 核保退回（UR）后的再次修改投保
- * - 投保查询页中查看并复用历史投保信息
- * 
- * 严格禁止：
- * - ❌ 不允许导入后自动提交
- * - ❌ 不允许修改 status
- * - ❌ 不允许触发 underwriting / 核保
- * - ❌ 不允许在组件内做业务判断
- * - ❌ 不允许写 KV / Worker
- * - ❌ 不允许使用 localStorage / sessionStorage
+ * - GET /api/proposal/detail?id=xxx 获取新版投保详情
+ * - GET /api/application/detail?id=xxx 获取旧版投保详情
+ * - GET /api/application/history 获取统一历史列表
  */
 const HistoryLoader: React.FC<HistoryLoaderProps> = ({
   visible,
@@ -72,12 +61,38 @@ const HistoryLoader: React.FC<HistoryLoaderProps> = ({
   onLoad,
 }) => {
   const [loading, setLoading] = useState<boolean>(false);
-  const [historyList, setHistoryList] = useState<ApplicationData[]>([]);
+  const [historyList, setHistoryList] = useState<any[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // 从接口获取指定投保单详情
-  const loadFromAPI = async (id: string): Promise<ApplicationData | null> => {
+  // 从接口获取指定投保单详情 (New Proposal)
+  const loadProposalDetail = async (id: string): Promise<ApplicationData | null> => {
+    try {
+      const response = await fetch(`/api/proposal/detail?id=${id}`, { method: "GET" });
+      if (!response.ok) throw new Error("获取详情失败");
+      const { data } = await response.json(); // data is the saved JSON payload
+      // data: { vehicle, owner, proposer, insured, coverages, energyType }
+      if (!data) return null;
+
+      return {
+        id,
+        timestamp: Date.now(),
+        energyType: data.energyType,
+        vehicle: data.vehicle,
+        owner: data.owner,
+        proposer: data.proposer,
+        insured: data.insured,
+        coverages: data.coverages,
+        status: "Unknown"
+      };
+    } catch (e: any) {
+      console.error("Failed to load proposal detail", e);
+      return null;
+    }
+  }
+
+  // 从接口获取指定投保单详情 (Legacy)
+  const loadLegacyDetail = async (id: string): Promise<ApplicationData | null> => {
     try {
       const response = await fetch(`/api/application/detail?id=${id}`, {
         method: "GET",
@@ -88,16 +103,29 @@ const HistoryLoader: React.FC<HistoryLoaderProps> = ({
         throw new Error("获取投保详情失败");
       }
 
-      const data = await response.json();
-      return data;
+      const res = await response.json();
+      const data = res.data;
+      if (!data) return null;
+
+      return {
+        id,
+        timestamp: 0,
+        energyType: data.vehicle?.energyType || "FUEL",
+        vehicle: data.vehicle,
+        owner: data.owner,
+        proposer: data.proposer,
+        insured: data.insured,
+        coverages: data.coverages || [],
+        status: res.status
+      };
     } catch (e: any) {
       console.error("从接口获取历史记录失败:", e);
       return null;
     }
   };
 
-  // 从接口获取历史投保列表
-  const loadHistoryList = async (): Promise<ApplicationData[]> => {
+  // 从接口获取历史投保列表 (Unified)
+  const loadHistoryList = async (): Promise<any[]> => {
     try {
       const response = await fetch(`/api/application/history`, {
         method: "GET",
@@ -125,17 +153,41 @@ const HistoryLoader: React.FC<HistoryLoaderProps> = ({
       setError(null);
 
       try {
-        // 如果提供了 applicationId，从接口获取单个详情
         if (applicationId) {
-          const apiData = await loadFromAPI(applicationId);
-          if (apiData) {
-            setHistoryList([apiData]);
-            setSelectedId(apiData.id);
+          if (applicationId.startsWith("PROP")) {
+            const d = await loadProposalDetail(applicationId);
+            if (d) {
+              // Adapt data for list display
+              const displayItem = {
+                id: d.id,
+                timestamp: d.timestamp,
+                status: "CURRENT",
+                energyType: d.energyType,
+                plate: d.vehicle?.plate,
+                brand: d.vehicle?.brand,
+                vehicle_type: d.vehicle?.vehicleType
+              };
+              setHistoryList([displayItem]);
+              setSelectedId(d.id);
+            } else setError("未找到记录");
           } else {
-            setError("未找到对应的投保记录");
+            const d = await loadLegacyDetail(applicationId);
+            if (d) {
+              const displayItem = {
+                id: d.id,
+                timestamp: d.timestamp,
+                status: d.status,
+                energyType: d.energyType,
+                plate: d.vehicle?.plate,
+                brand: d.vehicle?.brand,
+                vehicle_type: d.vehicle?.vehicleType
+              };
+              setHistoryList([displayItem]);
+              setSelectedId(d.id);
+            } else setError("未找到记录");
           }
         } else {
-          // 从 API 获取所有历史记录
+          // Normal mode: Load list
           const historyData = await loadHistoryList();
           if (historyData.length === 0) {
             setError("暂无历史投保记录");
@@ -154,22 +206,33 @@ const HistoryLoader: React.FC<HistoryLoaderProps> = ({
   }, [visible, applicationId]);
 
   // 一键导入
-  const handleImport = () => {
+  const handleImport = async () => {
     if (!selectedId) {
       alert("请先选择要导入的记录");
       return;
     }
 
-    const selectedData = historyList.find(item => item.id === selectedId);
-    if (!selectedData) {
-      alert("未找到选中的记录");
-      return;
-    }
+    setLoading(true);
+    try {
+      let fullData: ApplicationData | null = null;
+      if (selectedId.startsWith("PROP")) {
+        fullData = await loadProposalDetail(selectedId);
+      } else {
+        fullData = await loadLegacyDetail(selectedId);
+      }
 
-    // 调用父组件的 onLoad，仅填充表单字段
-    // 不触发提交，不修改 status
-    onLoad(selectedData);
-    onClose();
+      if (!fullData) {
+        alert("无法获取该记录的完整详情");
+        return;
+      }
+
+      onLoad(fullData);
+      onClose();
+    } catch (e) {
+      alert("导入失效");
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (!visible) return null;
@@ -241,52 +304,25 @@ const HistoryLoader: React.FC<HistoryLoaderProps> = ({
                               : "text-gray-800"
                           )}
                         >
-                          {item.vehicle.plate || "未填写车牌"}
+                          {item.plate || "未填写车牌"}
                         </span>
                         {item.status && (
                           <span
                             className={cn(
                               "text-xs px-2 py-0.5 rounded-full",
-                              item.status === "APPLIED"
-                                ? "bg-blue-100 text-blue-700"
-                                : item.status === "UI"
-                                  ? "bg-blue-100 text-blue-700"
-                                  : item.status === "UA"
-                                    ? "bg-green-100 text-green-700"
-                                    : item.status === "UR"
-                                      ? "bg-red-100 text-red-700"
-                                      : item.status === "PAID"
-                                        ? "bg-green-100 text-green-700"
-                                        : item.status === "ISSUED"
-                                          ? "bg-green-100 text-green-700"
-                                          : "bg-gray-100 text-gray-700"
+                              getStatusColor(item.status)
                             )}
                           >
-                            {item.status === "APPLIED"
-                              ? "核保中"
-                              : item.status === "UI"
-                                ? "核保中"
-                                : item.status === "UA"
-                                  ? "核保通过"
-                                  : item.status === "UR"
-                                    ? "退回修改"
-                                    : item.status === "PAID"
-                                      ? "已支付"
-                                      : item.status === "ISSUED"
-                                        ? "已承保"
-                                        : item.status}
+                            {getStatusText(item.status)}
                           </span>
                         )}
                       </div>
 
                       {/* 车辆信息 */}
                       <div className="text-sm text-gray-600 space-y-1">
-                        <div>品牌：{item.vehicle.brand || "未填写"}</div>
+                        <div>品牌：{item.brand || "未填写"}</div>
                         <div>
                           车型：{item.energyType === "NEV" ? "新能源" : "燃油车"}
-                        </div>
-                        <div>
-                          使用性质：{item.vehicle.useNature || "未填写"}
                         </div>
                       </div>
 
@@ -369,5 +405,39 @@ const HistoryLoader: React.FC<HistoryLoaderProps> = ({
     </div>
   );
 };
+
+function getStatusColor(status?: string) {
+  switch (status) {
+    case "SUBMITTED":
+    case "APPLIED":
+    case "UI":
+      return "bg-blue-100 text-blue-700";
+    case "UA":
+    case "APPROVED":
+    case "PAID":
+    case "ISSUED":
+      return "bg-green-100 text-green-700";
+    case "UR":
+    case "REJECTED":
+      return "bg-red-100 text-red-700";
+    default:
+      return "bg-gray-100 text-gray-700";
+  }
+}
+
+function getStatusText(status?: string) {
+  switch (status) {
+    case "SUBMITTED": return "已提交";
+    case "APPLIED": return "核保中";
+    case "UI": return "核保中";
+    case "UA": return "核保通过";
+    case "APPROVED": return "核保通过";
+    case "UR": return "退回修改";
+    case "REJECTED": return "已拒保";
+    case "PAID": return "已支付";
+    case "ISSUED": return "已承保";
+    default: return status || "未知";
+  }
+}
 
 export default HistoryLoader;
