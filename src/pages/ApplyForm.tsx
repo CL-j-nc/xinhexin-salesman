@@ -158,19 +158,49 @@ const ApplyForm: React.FC = () => {
   const [showCRMVehiclePicker, setShowCRMVehiclePicker] = useState(false);
   const [crmTargetFor, setCRMTargetFor] = useState<"owner" | "proposer" | "insured">("owner");
 
+  // Auto-load draft data
   useEffect(() => {
-    const stored = sessionStorage.getItem("energyType");
-    if (stored === "NEV" || stored === "FUEL") {
-      setEnergyType(stored);
-      setVehicle(prev => ({ ...prev, energyType: stored }));
-      initializeCoverages(stored);
-    } else {
-      // 默认使用 FUEL，不跳转
-      setEnergyType("FUEL");
-      initializeCoverages("FUEL");
+    try {
+      const draft = sessionStorage.getItem("apply_form_draft");
+      if (draft) {
+        const parsed = JSON.parse(draft);
+        if (parsed.step) setCurrentStep(parsed.step);
+        if (parsed.vehicle) setVehicle(parsed.vehicle);
+        if (parsed.owner) setOwner(parsed.owner);
+        if (parsed.proposer) setProposer(parsed.proposer);
+        if (parsed.insured) setInsured(parsed.insured);
+        if (parsed.coverages) setCoverages(parsed.coverages);
+        if (parsed.energyType) setEnergyType(parsed.energyType);
+      } else {
+        // Only initialize default if no draft exists
+        const storedType = sessionStorage.getItem("energyType");
+        if (storedType === "NEV" || storedType === "FUEL") {
+          setEnergyType(storedType);
+          setVehicle(prev => ({ ...prev, energyType: storedType }));
+          initializeCoverages(storedType);
+        } else {
+          setEnergyType("FUEL");
+          initializeCoverages("FUEL");
+        }
+      }
+    } catch (e) {
+      console.error("Failed to load draft", e);
     }
-    // CRM数据现在通过API从D1数据库获取，不再使用localStorage预置
   }, []);
+
+  // Auto-save draft data
+  useEffect(() => {
+    const draft = {
+      step: currentStep,
+      vehicle,
+      owner,
+      proposer,
+      insured,
+      coverages,
+      energyType
+    };
+    sessionStorage.setItem("apply_form_draft", JSON.stringify(draft));
+  }, [currentStep, vehicle, owner, proposer, insured, coverages, energyType]);
 
   const initializeCoverages = (type: EnergyType) => {
     const isNEV = type === "NEV";
@@ -369,6 +399,8 @@ const ApplyForm: React.FC = () => {
 
       const result = await response.json();
       // 存储 application ID 并跳转到状态页
+      // 提交成功后清除草稿
+      sessionStorage.removeItem("apply_form_draft");
       sessionStorage.setItem("applicationId", result.proposalId);
       navigate("/status");
     } catch (error: any) {
