@@ -357,38 +357,22 @@ const ApplyForm: React.FC = () => {
         coverages: coverages.filter(c => c.selected),
       };
 
-      // 首先尝试调用 API
-      try {
-        const response = await fetch("/api/application/apply", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(applicationData),
-        });
+      // 调用 API 保存到 KV（核保端需要读取这个数据）
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
+      const response = await fetch(`${API_BASE_URL}/api/proposal/submit`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(applicationData),
+      });
 
-        if (response.ok) {
-          const result = await response.json();
-          // 存储 application ID 并跳转到状态页
-          sessionStorage.setItem("applicationId", result.requestId || result.applicationNo);
-          navigate("/status");
-          return;
-        }
-      } catch (apiError) {
-        console.log("API不可用，使用本地存储模式");
+      if (!response.ok) {
+        const errorResult = await response.json().catch(() => ({ error: "请求处理失败" }));
+        throw new Error(errorResult.error || `服务器错误: ${response.status}`);
       }
 
-      // 降级到本地存储模式
-      const localId = `LOCAL-${Date.now()}`;
-      const existingApps = JSON.parse(localStorage.getItem("insurance_applications") || "[]");
-      existingApps.push({
-        id: localId,
-        timestamp: Date.now(),
-        status: "APPLIED",
-        ...applicationData,
-      });
-      localStorage.setItem("insurance_applications", JSON.stringify(existingApps));
-
-      sessionStorage.setItem("applicationId", localId);
-      alert("投保申请已保存到本地（离线模式）");
+      const result = await response.json();
+      // 存储 application ID 并跳转到状态页
+      sessionStorage.setItem("applicationId", result.proposalId);
       navigate("/status");
     } catch (error: any) {
       alert(error.message || "提交失败，请重试");

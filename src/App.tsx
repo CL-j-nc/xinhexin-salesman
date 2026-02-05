@@ -4,6 +4,7 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import Apply from "./pages/Apply";
 import ApplyForm from "./pages/ApplyForm";
 import Status from "./pages/Status";
+import UnderwritingQuery from "./pages/UnderwritingQuery";
 import SiteFooter from "./components/SiteFooter";
 
 const App: React.FC = () => {
@@ -15,6 +16,7 @@ const App: React.FC = () => {
             <Route path="/" element={<Apply />} />
             <Route path="/apply" element={<ApplyForm />} />
             <Route path="/status" element={<Status />} />
+            <Route path="/query" element={<UnderwritingQuery />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </div>

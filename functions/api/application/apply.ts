@@ -2,8 +2,8 @@
 // 功能：接收投保申请，存储到 KV，返回 requestId
 
 interface Env {
-    POLICY_KV: KVNamespace;
-    DB: D1Database;
+    KV_BINDING: KVNamespace;
+    DB?: D1Database;
 }
 
 export async function onRequestPost({ request, env }: { request: Request; env: Env }) {
@@ -21,12 +21,12 @@ export async function onRequestPost({ request, env }: { request: Request; env: E
         };
 
         // 1. 存储到 KV，30天过期 (用于快速状态查询)
-        await env.POLICY_KV.put(applicationNo, JSON.stringify(payload), {
+        await env.KV_BINDING.put(applicationNo, JSON.stringify(payload), {
             expirationTtl: 2592000,
         });
 
         // 2. RequestId 映射到 ApplicationNo
-        await env.POLICY_KV.put(`request:${requestId}`, applicationNo, {
+        await env.KV_BINDING.put(`request:${requestId}`, applicationNo, {
             expirationTtl: 86400,
         });
 

@@ -1,34 +1,36 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-// 状态显示文案映射（完全按照规范）
+// 状态显示文案映射
 const STATUS_TEXT_MAP: Record<string, string> = {
-  APPLIED: "核保中",
+  APPLIED: "投保成功",
+  SUBMITTED: "已提交",
   UI: "核保中",
   UA: "核保通过",
   UR: "退回修改",
   PAID: "已支付",
   ISSUED: "已承保",
+  REJECTED: "已拒保",
 };
 
 // 状态图标映射
 const STATUS_ICON_MAP: Record<string, string> = {
-  APPLIED: "⏳",
+  APPLIED: "✅",
   UI: "⏳",
   UA: "✅",
-  UR: "❌",
-  PAID: "💰",
-  ISSUED: "🎉",
+  UR: "⚠️",
+  PAID: "💳",
+  ISSUED: "📋",
 };
 
 // 状态颜色映射
 const STATUS_COLOR_MAP: Record<string, string> = {
-  APPLIED: "text-blue-600",
+  APPLIED: "text-emerald-600",
   UI: "text-blue-600",
-  UA: "text-green-600",
-  UR: "text-red-600",
-  PAID: "text-green-600",
-  ISSUED: "text-green-600",
+  UA: "text-emerald-600",
+  UR: "text-orange-600",
+  PAID: "text-emerald-600",
+  ISSUED: "text-emerald-600",
 };
 
 export default function Status() {
@@ -40,7 +42,7 @@ export default function Status() {
 
   useEffect(() => {
     const applicationId = sessionStorage.getItem("applicationId");
-    
+
     if (!applicationId) {
       setError("缺少申请单号");
       setLoading(false);
@@ -52,7 +54,8 @@ export default function Status() {
     // ==================== 核心轮询逻辑：只读取 status ====================
     const queryStatus = async () => {
       try {
-        const res = await fetch(`/api/application/status?id=${applicationId}`, {
+        const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
+        const res = await fetch(`${API_BASE_URL}/api/proposal/status?id=${applicationId}`, {
           method: "GET",
           headers: { "Content-Type": "application/json" },
         });
@@ -60,13 +63,13 @@ export default function Status() {
         if (!res.ok) throw new Error("查询失败");
 
         const data = await res.json();
-        
+
         setStatus(data.status);
         setReason(data.reason || "");
         setLoading(false);
 
         // 终态停止轮询：PAID 或 ISSUED
-        if (data.status === "PAID" || data.status === "ISSUED") {
+        if (data.status === "PAID" || data.status === "ISSUED" || data.status === "REJECTED") {
           clearInterval(timer);
         }
       } catch (e: any) {
@@ -155,17 +158,19 @@ export default function Status() {
             )}
 
             {/* 状态说明 */}
-            <div className="text-sm text-gray-500 mt-4">
-              {status === "APPLIED" || status === "UI" ? (
-                <p>系统正在进行风险评估，请耐心等待</p>
+            <div className="text-sm text-gray-600 mt-4 leading-relaxed">
+              {status === "APPLIED" ? (
+                <p>✨ 投保申请已成功提交！<br />系统已将您的申请转入核保审核，请耐心等待</p>
+              ) : status === "UI" ? (
+                <p>⏳ 核保中<br />系统正在进行风险评估，请耐心等待</p>
               ) : status === "UA" ? (
-                <p>您的投保申请已通过核保，可以进行支付</p>
+                <p>🎉 恭喜您！您的投保申请已通过核保<br />现在可以前往支付完成投保</p>
               ) : status === "UR" ? (
-                <p>您的投保申请需要修改后重新提交</p>
+                <p>⚠️ 您的投保申请需要修改后重新提交</p>
               ) : status === "PAID" ? (
-                <p>支付成功，系统正在生成保单</p>
+                <p>✅ 支付成功，系统正在生成保单</p>
               ) : status === "ISSUED" ? (
-                <p>保单已生成，承保成功</p>
+                <p>🎊 保单已生成，恭喜您承保成功！</p>
               ) : null}
             </div>
 

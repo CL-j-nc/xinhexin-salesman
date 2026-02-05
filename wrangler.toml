@@ -1,7 +1,14 @@
-name = "xinhexin-salesman"
+name = "chinalife-xinhexin-s"
 compatibility_date = "2024-05-01"
+pages_build_output_dir = "dist"
+
+# 全局 KV 绑定 - 对所有环境生效
+kv_namespaces = [
+  { binding = "KV_BINDING", id = "893ca20cf01c42d894ec2977f73710df" }
+]
 
 [env.production]
+# production 环境的 KV 绑定
 kv_namespaces = [
   { binding = "KV_BINDING", id = "893ca20cf01c42d894ec2977f73710df" }
 ]

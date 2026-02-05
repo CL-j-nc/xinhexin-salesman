@@ -1,28 +1,15 @@
-// functions/api/application/[id].ts
-// 功能：根据 requestId 或 applicationNo 查询投保状态
+// functions/api/application/[id]/approve.ts
+// 功能：核保通过操作
 
-interface Env {
-    KV_BINDING: KVNamespace;
-}
-
-export async function onRequestGet({ params, env }: { params: { id: string }; env: Env }) {
+export async function onRequestPost({ params, env }: any) {
     try {
-        const id = params.id;
+        const applicationNo = params.id;
 
-        // 先检查是否是 requestId 映射
-        let applicationNo = await env.KV_BINDING.get(`request:${id}`);
         if (!applicationNo) {
-            applicationNo = id; // 直接使用 id 作为 applicationNo
-        }
-
-        // 从 KV 读取数据
-        const data = await env.KV_BINDING.get(applicationNo);
-
-        if (!data) {
             return new Response(
-                JSON.stringify({ status: null, reason: "未找到投保记录" }),
+                JSON.stringify({ error: "缺少投保单号" }),
                 {
-                    status: 200,
+                    status: 400,
                     headers: {
                         "Content-Type": "application/json",
                         "Access-Control-Allow-Origin": "*",
@@ -31,18 +18,34 @@ export async function onRequestGet({ params, env }: { params: { id: string }; en
             );
         }
 
+        // 从 KV 读取投保数据
+        const data = await env.KV_BINDING.get(applicationNo);
+
+        if (!data) {
+            return new Response(
+                JSON.stringify({ error: "未找到投保记录" }),
+                {
+                    status: 404,
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Access-Control-Allow-Origin": "*",
+                    },
+                }
+            );
+        }
+
+        // 解析并更新状态为 UA（核保通过）
         const parsed = JSON.parse(data);
+        parsed.status = "UA";
+        parsed.approvedAt = new Date().toISOString();
+
+        // 保存回 KV
+        await env.KV_BINDING.put(applicationNo, JSON.stringify(parsed), {
+            expirationTtl: 2592000, // 30天
+        });
 
         return new Response(
-            JSON.stringify({
-                applicationNo: parsed.applicationNo,
-                status: parsed.status || "APPLIED",
-                reason: parsed.reason || "",
-                vehicle: parsed.vehicle,
-                owner: parsed.owner,
-                coverages: parsed.coverages,
-                createdAt: parsed.createdAt,
-            }),
+            JSON.stringify({ success: true, status: "UA" }),
             {
                 status: 200,
                 headers: {
@@ -52,8 +55,9 @@ export async function onRequestGet({ params, env }: { params: { id: string }; en
             }
         );
     } catch (error: any) {
+        console.error("Approve error:", error.message);
         return new Response(
-            JSON.stringify({ status: null, reason: error.message || "查询失败" }),
+            JSON.stringify({ error: error.message || "操作失败" }),
             {
                 status: 500,
                 headers: {
@@ -65,13 +69,13 @@ export async function onRequestGet({ params, env }: { params: { id: string }; en
     }
 }
 
-// CORS 预检请求
+// CORS 预检
 export async function onRequestOptions() {
     return new Response(null, {
         status: 204,
         headers: {
             "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Methods": "GET, OPTIONS",
+            "Access-Control-Allow-Methods": "POST, OPTIONS",
             "Access-Control-Allow-Headers": "Content-Type",
             "Access-Control-Max-Age": "86400",
         },

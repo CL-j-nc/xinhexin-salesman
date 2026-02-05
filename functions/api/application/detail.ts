@@ -1,13 +1,25 @@
-// functions/api/application/[id].ts
-// 功能：根据 requestId 或 applicationNo 查询投保状态
+// functions/api/application/detail.ts
+// 功能：根据 applicationId 或 requestId 查询投保详情
 
-interface Env {
-    KV_BINDING: KVNamespace;
-}
-
-export async function onRequestGet({ params, env }: { params: { id: string }; env: Env }) {
+export async function onRequestGet({ request, env }: any) {
     try {
-        const id = params.id;
+        const { searchParams } = new URL(request.url);
+        const id = searchParams.get("id");
+
+        if (!id) {
+            return new Response(
+                JSON.stringify({
+                    error: "缺少 id 参数",
+                }),
+                {
+                    status: 400,
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Access-Control-Allow-Origin": "*",
+                    },
+                }
+            );
+        }
 
         // 先检查是否是 requestId 映射
         let applicationNo = await env.KV_BINDING.get(`request:${id}`);
@@ -20,9 +32,11 @@ export async function onRequestGet({ params, env }: { params: { id: string }; en
 
         if (!data) {
             return new Response(
-                JSON.stringify({ status: null, reason: "未找到投保记录" }),
+                JSON.stringify({
+                    error: "未找到投保记录",
+                }),
                 {
-                    status: 200,
+                    status: 404,
                     headers: {
                         "Content-Type": "application/json",
                         "Access-Control-Allow-Origin": "*",
@@ -33,27 +47,19 @@ export async function onRequestGet({ params, env }: { params: { id: string }; en
 
         const parsed = JSON.parse(data);
 
-        return new Response(
-            JSON.stringify({
-                applicationNo: parsed.applicationNo,
-                status: parsed.status || "APPLIED",
-                reason: parsed.reason || "",
-                vehicle: parsed.vehicle,
-                owner: parsed.owner,
-                coverages: parsed.coverages,
-                createdAt: parsed.createdAt,
-            }),
-            {
-                status: 200,
-                headers: {
-                    "Content-Type": "application/json",
-                    "Access-Control-Allow-Origin": "*",
-                },
-            }
-        );
+        // 返回完整的投保详情
+        return new Response(JSON.stringify(parsed), {
+            status: 200,
+            headers: {
+                "Content-Type": "application/json",
+                "Access-Control-Allow-Origin": "*",
+            },
+        });
     } catch (error: any) {
         return new Response(
-            JSON.stringify({ status: null, reason: error.message || "查询失败" }),
+            JSON.stringify({
+                error: error.message || "查询失败",
+            }),
             {
                 status: 500,
                 headers: {

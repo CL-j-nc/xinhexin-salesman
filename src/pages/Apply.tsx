@@ -103,10 +103,34 @@ const Apply: React.FC = () => {
                     strokeLinecap="round"
                   />
                 </svg>
-                <h3 className="text-xl font-bold text-slate-800">新核心承保系统</h3>
+                <h3 className="text-xl font-bold text-slate-800">核保进度查询</h3>
               </div>
               <p className="text-sm text-slate-600 leading-relaxed pl-1">
-                投核保信息查询
+                查看您已提交的投保进度
+              </p>
+            </div>
+
+            {/* Underwriting Query Entry */}
+            <div
+              onClick={() => navigate("/query")}
+              role="button"
+              tabIndex={0}
+              className={cn(
+                "module-glow module-glow-purple",
+                "bg-gradient-to-br from-purple-50 to-white rounded-2xl p-8 shadow-lg cursor-pointer transition-all duration-300",
+                "hover:shadow-2xl hover:-translate-y-1 border-2 border-purple-200",
+                "active:scale-[0.98]"
+              )}
+            >
+              <div className="flex items-center gap-3 mb-3">
+                <svg width="48" height="48" viewBox="0 0 48 48" fill="none" className="text-purple-600">
+                  <path d="M10 14h28a2 2 0 0 1 2 2v20a2 2 0 0 1-2 2H10a2 2 0 0 1-2-2V16a2 2 0 0 1 2-2z" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+                  <path d="M16 20h16M16 26h16M16 32h8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                </svg>
+                <h3 className="text-xl font-bold text-purple-700">投保信息查询</h3>
+              </div>
+              <p className="text-sm text-slate-600 leading-relaxed pl-1">
+                输入多条件查询投保核保进度
               </p>
             </div>
           </div>
