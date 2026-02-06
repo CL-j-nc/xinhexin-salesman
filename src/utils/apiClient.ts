@@ -52,11 +52,16 @@ const ensurePath = (path: string): string => {
 
 const getPrimaryApiBase = (): string => {
     const envBase = normalizeBase(import.meta.env.VITE_API_BASE_URL || "");
-    if (envBase) return envBase;
 
-    // 开发环境优先走本地 API，生产兜底走固定 Worker 域名
-    if (import.meta.env.DEV) return "http://localhost:8787";
-    return FALLBACK_API_BASE;
+    // 开发环境优先走本地 API（允许自定义 envBase）
+    if (import.meta.env.DEV) return envBase || "http://localhost:8787";
+
+    // 生产环境优先同域，避免跨域 + Access 预检失败
+    if (typeof window !== "undefined" && window.location?.origin) {
+        return window.location.origin;
+    }
+
+    return envBase || FALLBACK_API_BASE;
 };
 
 export const getApiBases = (): string[] => {
