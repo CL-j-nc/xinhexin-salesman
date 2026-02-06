@@ -604,12 +604,32 @@ const ApplyForm: React.FC = () => {
             <div className="p-4 space-y-3">
               <div className="flex items-center justify-between border-b border-gray-100 py-3">
                 <span className="text-sm text-gray-500">车牌号</span>
-                <input
-                  value={vehicle.plate}
-                  onChange={e => setVehicle({ ...vehicle, plate: e.target.value.toUpperCase() })}
-                  placeholder="请输入车牌号"
-                  className="text-right text-sm outline-none flex-1 ml-4"
-                />
+                <div className="flex items-center flex-1 justify-end ml-4 gap-2">
+                  <select
+                    value={vehicle.plate ? vehicle.plate.substring(0, 1) : "苏"}
+                    onChange={e => {
+                      const prefix = e.target.value;
+                      const suffix = vehicle.plate ? vehicle.plate.substring(1) : "";
+                      setVehicle({ ...vehicle, plate: prefix + suffix });
+                    }}
+                    className="text-sm font-bold text-gray-700 bg-gray-50 rounded px-1 py-0.5 outline-none border border-transparent hover:border-emerald-200 transition-colors cursor-pointer appearance-none text-center min-w-[3em]"
+                    style={{ textAlignLast: 'center' }}
+                  >
+                    {["京", "津", "冀", "晋", "蒙", "辽", "吉", "黑", "沪", "苏", "浙", "皖", "闽", "赣", "鲁", "豫", "鄂", "湘", "粤", "桂", "琼", "渝", "川", "贵", "云", "藏", "陕", "甘", "青", "宁", "新", "港", "澳", "台"].map(p => (
+                      <option key={p} value={p}>{p}</option>
+                    ))}
+                  </select>
+                  <input
+                    value={vehicle.plate ? vehicle.plate.substring(1) : ""}
+                    onChange={e => {
+                      const prefix = vehicle.plate ? vehicle.plate.substring(0, 1) : "苏";
+                      const suffix = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "");
+                      setVehicle({ ...vehicle, plate: prefix + suffix });
+                    }}
+                    placeholder="请输入号码"
+                    className="text-right text-sm font-bold text-gray-800 outline-none w-24 uppercase placeholder-gray-300"
+                  />
+                </div>
               </div>
 
               <div className="flex items-center justify-between border-b border-gray-100 py-3">
