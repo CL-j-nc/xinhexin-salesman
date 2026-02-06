@@ -1,5 +1,8 @@
 import type { CRMCustomer, CRMVehicle } from "./crmStorage";
 
+// API 基础地址 - 从环境变量读取，或使用默认值
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "https://xinhexin-api.chinalife-shiexinhexin.workers.dev";
+
 // 扩展数据类型 - 生产环境专用
 export interface VehicleProfile {
     vehiclePolicyUid: string;
@@ -279,4 +282,4 @@ class DatabaseSource implements CRMDataSource {
 }
 
 // 导出单例 - 仅使用数据库源
-export const crmDataSource = new DatabaseSource();
+export const crmDataSource = new DatabaseSource(API_BASE);

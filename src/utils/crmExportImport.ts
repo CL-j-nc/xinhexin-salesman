@@ -6,31 +6,38 @@
 
 import type { CRMVehicle, CRMCustomer } from "./crmStorage";
 import { crmDataSource } from "./crmDataSource";
+import {
+    validateAndMapColumns,
+    vehicleFieldMappings,
+    ownerFieldMappings,
+    transformFieldValue
+} from "./fieldMapping";
 
 // ==================== 导出功能 ====================
 
 /**
  * 将车辆数据导出为 CSV 格式
+ * 使用统一的字段映射确保列名一致
  */
 export const exportVehiclesToCSV = async (): Promise<string> => {
     const vehicles = await crmDataSource.getAllVehicles();
 
-    // CSV 表头
+    // 使用统一的字段映射获取 CSV 表头
     const headers = [
         "ID",
         "昵称",
-        "车牌号",
-        "车架号(VIN)",
-        "发动机号",
-        "品牌型号",
-        "车辆类型",
-        "使用性质",
-        "注册日期",
-        "发证日期",
-        "整备质量(kg)",
-        "核定载质量(kg)",
-        "座位数",
-        "能源类型",
+        vehicleFieldMappings.plate.label,
+        vehicleFieldMappings.vin.label,
+        vehicleFieldMappings.engineNo.label,
+        vehicleFieldMappings.brand.label,
+        vehicleFieldMappings.vehicleType.label,
+        vehicleFieldMappings.useNature.label,
+        vehicleFieldMappings.registerDate.label,
+        vehicleFieldMappings.issueDate.label,
+        vehicleFieldMappings.curbWeight.label,
+        vehicleFieldMappings.approvedLoad.label,
+        vehicleFieldMappings.seats.label,
+        vehicleFieldMappings.energyType.label,
         "创建时间",
         "使用次数",
         "是否收藏",
@@ -208,52 +215,70 @@ export const importVehiclesFromCSV = async (csvContent: string): Promise<ImportR
         const headers = rows[0];
         const dataRows = rows.slice(1);
 
-        // 查找列索引
-        const findIndex = (name: string) => headers.findIndex(h => h.includes(name));
+        // 使用统一的字段映射进行验证和列索引查询
+        const { success: isValid, mapping, errors: mappingErrors } = validateAndMapColumns(headers);
 
-        const plateIdx = findIndex("车牌");
-        const vinIdx = findIndex("VIN") !== -1 ? findIndex("VIN") : findIndex("车架");
-        const engineIdx = findIndex("发动机");
-        const brandIdx = findIndex("品牌");
-        const typeIdx = findIndex("车辆类型");
-        const natureIdx = findIndex("使用性质");
-        const registerIdx = findIndex("注册");
-        const issueIdx = findIndex("发证");
-        const weightIdx = findIndex("整备");
-        const loadIdx = findIndex("载质量");
-        const seatsIdx = findIndex("座位");
-        const energyIdx = findIndex("能源");
-
-        if (plateIdx === -1 || vinIdx === -1) {
-            return { success: false, imported: 0, errors: ["CSV 缺少必要的列：车牌号、车架号"] };
+        if (!isValid) {
+            return {
+                success: false,
+                imported: 0,
+                errors: [
+                    "CSV 列名识别失败：",
+                    ...mappingErrors,
+                    "",
+                    "当前 CSV 列名: " + headers.join(", ")
+                ]
+            };
         }
 
         const vehiclesToImport: Omit<CRMVehicle, "id" | "createdAt" | "usageCount">[] = [];
 
         dataRows.forEach((row, index) => {
             try {
-                if (!row[plateIdx] || !row[vinIdx]) {
+                // 检查必需字段
+                const plateIdx = mapping["plate"];
+                const vinIdx = mapping["vin"];
+
+                if (plateIdx === undefined || vinIdx === undefined || !row[plateIdx] || !row[vinIdx]) {
                     result.errors.push(`第 ${index + 2} 行：车牌号或车架号为空`);
                     return;
                 }
 
+                // 构建车辆对象
                 const vehicle: Omit<CRMVehicle, "id" | "createdAt" | "usageCount"> = {
                     nickname: row[plateIdx],
                     plate: row[plateIdx],
                     vin: row[vinIdx],
-                    engineNo: engineIdx !== -1 ? row[engineIdx] || "" : "",
-                    brand: brandIdx !== -1 ? row[brandIdx] || "" : "",
-                    vehicleType: typeIdx !== -1 ? row[typeIdx] || "客车" : "客车",
-                    useNature: natureIdx !== -1 ? row[natureIdx] || "家庭自用" : "家庭自用",
-                    registerDate: registerIdx !== -1 ? row[registerIdx] || "" : "",
-                    issueDate: issueIdx !== -1 ? row[issueIdx] || "" : "",
-                    curbWeight: weightIdx !== -1 ? row[weightIdx] || "" : "",
-                    approvedLoad: loadIdx !== -1 ? row[loadIdx] || "" : "",
-                    seats: seatsIdx !== -1 ? row[seatsIdx] || "5" : "5",
-                    energyType: energyIdx !== -1 && row[energyIdx]?.includes("新能源") ? "NEV" : "FUEL",
+                    engineNo: mapping["engineNo"] !== undefined ? (row[mapping["engineNo"]] || "") : "",
+                    brand: mapping["brand"] !== undefined ? (row[mapping["brand"]] || "") : "",
+                    vehicleType: mapping["vehicleType"] !== undefined ? (row[mapping["vehicleType"]] || "客车") : "客车",
+                    useNature: mapping["useNature"] !== undefined ? (row[mapping["useNature"]] || "家庭自用") : "家庭自用",
+                    registerDate: mapping["registerDate"] !== undefined ? (row[mapping["registerDate"]] || "") : "",
+                    issueDate: mapping["issueDate"] !== undefined ? (row[mapping["issueDate"]] || "") : "",
+                    curbWeight: mapping["curbWeight"] !== undefined ? (row[mapping["curbWeight"]] || "") : "",
+                    approvedLoad: mapping["approvedLoad"] !== undefined ? (row[mapping["approvedLoad"]] || "") : "",
+                    seats: mapping["seats"] !== undefined ? (row[mapping["seats"]] || "5") : "5",
+                    energyType: mapping["energyType"] !== undefined
+                        ? transformFieldValue("energyType", row[mapping["energyType"]])
+                        : "FUEL",
                     isFavorite: false,
                     tags: ["导入数据"]
                 };
+
+                // 如果有车主信息，添加到 policyInfo
+                const ownerNameIdx = mapping["ownerName"];
+                if (ownerNameIdx !== undefined && row[ownerNameIdx]) {
+                    vehicle.policyInfo = {
+                        ownerName: row[ownerNameIdx],
+                        ownerPhone: mapping["ownerPhone"] !== undefined ? (row[mapping["ownerPhone"]] || "") : "",
+                        ownerIdCard: mapping["ownerIdCard"] !== undefined ? (row[mapping["ownerIdCard"]] || "") : "",
+                        // 默认为空的值
+                        policyNo: "",
+                        coverages: [],
+                        applyTime: "",
+                        status: "APPLIED"
+                    };
+                }
 
                 vehiclesToImport.push(vehicle);
             } catch (e: any) {
@@ -282,6 +307,28 @@ export const importVehiclesFromCSV = async (csvContent: string): Promise<ImportR
 };
 
 /**
+ * 一键导入测试数据
+ */
+import { mockVehicles } from "./mockCRMData";
+
+export const importTestVehicles = async (): Promise<ImportResult> => {
+    try {
+        const imported = await crmDataSource.bulkAddVehicles(mockVehicles);
+        return {
+            success: true,
+            imported: imported.length,
+            errors: []
+        };
+    } catch (e: any) {
+        return {
+            success: false,
+            imported: 0,
+            errors: [`测试数据导入失败: ${e.message}`]
+        };
+    }
+};
+
+/**
  * 读取上传的文件并导入
  */
 export const handleFileImport = (
@@ -298,8 +345,8 @@ export const handleFileImport = (
             const result = await importVehiclesFromCSV(content);
             callback(result);
         } else {
-            // TODO: 实现客户导入
-            callback({ success: false, imported: 0, errors: ["客户导入功能开发中"] });
+            // 提示用户必须包含在车辆信息中
+            callback({ success: false, imported: 0, errors: ["注意：客户数据必须随车辆数据一起导入。请在车辆 CSV 中包含“车主姓名、电话”列。"] });
         }
     };
 

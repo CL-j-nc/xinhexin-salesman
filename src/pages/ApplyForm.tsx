@@ -411,7 +411,7 @@ const ApplyForm: React.FC = () => {
 
       // 调用 API 保存到 KV（核保端需要读取这个数据）
       const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
-      const response = await fetch(`${API_BASE_URL}/api/proposal/submit`, {
+      const response = await fetch(`${API_BASE_URL}/api/policy.salesman`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(applicationData),

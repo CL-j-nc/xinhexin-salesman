@@ -4,6 +4,7 @@ import {
     downloadVehiclesCSV,
     downloadCustomersCSV,
     handleFileImport,
+    importTestVehicles,
 } from "../utils/crmExportImport";
 
 interface CRMExportImportProps {
@@ -38,6 +39,27 @@ const CRMExportImport: React.FC<CRMExportImportProps> = ({
 
     const handleImportClick = () => {
         fileInputRef.current?.click();
+    };
+
+    const handleImportTestVehicles = async () => {
+        setImporting(true);
+        setImportResult(null);
+
+        const result = await importTestVehicles();
+        setImporting(false);
+
+        if (result.success) {
+            setImportResult({
+                success: true,
+                message: `成功导入 ${result.imported} 条测试数据`,
+            });
+            onImportComplete?.();
+        } else {
+            setImportResult({
+                success: false,
+                message: `导入失败：${result.errors.join("; ")}`,
+            });
+        }
     };
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -125,7 +147,28 @@ const CRMExportImport: React.FC<CRMExportImportProps> = ({
                             {importing ? "导入中..." : "点击选择 CSV 文件导入车辆数据"}
                         </button>
                         <p className="text-xs text-gray-400">
-                            支持的列：车牌号、车架号(VIN)、发动机号、品牌型号、车辆类型等
+                            支持的列：车牌号、车架号(VIN)、发动机号、品牌型号、车辆类型、车主姓名、车主电话、车主身份证等
+                        </p>
+                    </div>
+
+                    {/* 分割线 */}
+                    <div className="border-t border-gray-200" />
+
+                    {/* 测试数据区域 */}
+                    <div className="space-y-2">
+                        <h3 className="text-sm font-bold text-gray-700">🧪 测试数据</h3>
+                        <button
+                            onClick={handleImportTestVehicles}
+                            disabled={importing}
+                            className={cn(
+                                "w-full py-2 px-4 bg-amber-50 text-amber-600 rounded-lg hover:bg-amber-100 transition-colors text-sm font-medium",
+                                importing && "opacity-50 cursor-not-allowed"
+                            )}
+                        >
+                            一键导入测试数据 (Mock Data)
+                        </button>
+                        <p className="text-xs text-gray-400">
+                            将导入预设的测试车辆和车主信息
                         </p>
                     </div>
 

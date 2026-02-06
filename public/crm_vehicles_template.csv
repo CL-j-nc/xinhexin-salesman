@@ -1,5 +1,2 @@
-nickname,plate,vin,engineNo,brand,vehicleType,useNature,registerDate,issueDate,curbWeight,approvedLoad,seats
-公交1号,京A12345,LSUAT2K36BA000001,1000001,一汽,客车,公交客运,2023-01-01,2023-01-01,5000,10000,50
-货运1号,京B98765,LFVY3A3A6BA000002,1000002,解放,货车,营业货车,2023-02-01,2023-02-01,6000,8000,2
-出租1号,京C45678,LVHFC1AF6BA000003,1000003,吉利,客车,出租营业客运,2023-03-01,2023-03-01,1600,7,5
-租赁1号,京D23456,LNGLZ7A0XBA000004,1000004,北汽,客车,预约出租客运,2023-04-01,2023-04-01,1800,7,7
+owner,plateNo.,energyType,vin,engineNo,model,vehicleType,useCharacter,registerDate,issueDate,curbWeight,approvedLoad,approvedPassengerCapacity
+涡阳县锦钊运输有限责任公司,皖SC3545,fuel,LZZ7CLXB0KC269048,190517700997,汕德卡ZZ4256V324HE1H,重型半挂牵引车,营业货运,2019/6/3,2024/9/26,10100,40000,2

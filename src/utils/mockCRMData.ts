@@ -123,6 +123,7 @@ export const mockCustomers: CRMCustomer[] = [
     },
 ];
 
+
 export const mockVehicles: CRMVehicle[] = [
     {
         id: "vehicle_test_001",
@@ -143,6 +144,15 @@ export const mockVehicles: CRMVehicle[] = [
         usageCount: 10,
         isFavorite: true,
         tags: ["测试数据", "燃油车"],
+        policyInfo: {
+            policyNo: "",
+            coverages: [],
+            applyTime: "",
+            status: "APPLIED",
+            ownerName: "张三",
+            ownerIdCard: "110101198501011234",
+            ownerPhone: "13800138000"
+        }
     },
     {
         id: "vehicle_test_002",
@@ -163,6 +173,15 @@ export const mockVehicles: CRMVehicle[] = [
         usageCount: 5,
         isFavorite: true,
         tags: ["测试数据", "新能源车"],
+        policyInfo: {
+            policyNo: "",
+            coverages: [],
+            applyTime: "",
+            status: "APPLIED",
+            ownerName: "李四",
+            ownerIdCard: "310101199006151234",
+            ownerPhone: "13900139000"
+        }
     },
     {
         id: "vehicle_test_003",
@@ -183,6 +202,15 @@ export const mockVehicles: CRMVehicle[] = [
         usageCount: 3,
         isFavorite: false,
         tags: ["测试数据", "燃油车"],
+        policyInfo: {
+            policyNo: "",
+            coverages: [],
+            applyTime: "",
+            status: "APPLIED",
+            ownerName: "王五",
+            ownerIdCard: "440101198203201234",
+            ownerPhone: "13700137000"
+        }
     },
     {
         id: "vehicle_test_004",
@@ -203,6 +231,15 @@ export const mockVehicles: CRMVehicle[] = [
         usageCount: 2,
         isFavorite: false,
         tags: ["测试数据", "新能源车"],
+        policyInfo: {
+            policyNo: "",
+            coverages: [],
+            applyTime: "",
+            status: "APPLIED",
+            ownerName: "赵六",
+            ownerIdCard: "510101199512101234",
+            ownerPhone: "13600136000"
+        }
     },
     {
         id: "vehicle_test_005",
@@ -223,6 +260,15 @@ export const mockVehicles: CRMVehicle[] = [
         usageCount: 8,
         isFavorite: true,
         tags: ["测试数据", "燃油车", "货车"],
+        policyInfo: {
+            policyNo: "",
+            coverages: [],
+            applyTime: "",
+            status: "APPLIED",
+            ownerName: "陈七",
+            ownerIdCard: "110101197501011234",
+            ownerPhone: "01012345678"
+        }
     },
     {
         id: "vehicle_real_001",

@@ -1,0 +1,17 @@
+0 verbose cli /Users/zhangjunhuai/.nvm/versions/node/v24.13.0/bin/node /Users/zhangjunhuai/.nvm/versions/node/v24.13.0/lib/node_modules/npm/bin/npm-cli.js
+1 info using npm@11.6.2
+2 info using node@v24.13.0
+3 silly config load:file:/Users/zhangjunhuai/.nvm/versions/node/v24.13.0/lib/node_modules/npm/npmrc
+4 silly config load:file:/Users/zhangjunhuai/SHIE人寿新核心承保系统/xinhexin-salesman/.npmrc
+5 silly config load:file:/Users/zhangjunhuai/.nvm/versions/node/v24.13.0/etc/npmrc
+6 verbose title npm exec wrangler pages deploy dist --project-name chinalife-xinhexin-s
+7 verbose argv "exec" "--" "wrangler" "pages" "deploy" "dist" "--project-name" "chinalife-xinhexin-s"
+8 verbose logfile logs-max:10 dir:/Users/zhangjunhuai/SHIE人寿新核心承保系统/xinhexin-salesman/.npm/_logs/2026-02-06T10_15_48_279Z-
+9 verbose logfile /Users/zhangjunhuai/SHIE人寿新核心承保系统/xinhexin-salesman/.npm/_logs/2026-02-06T10_15_48_279Z-debug-0.log
+10 silly logfile done cleaning log files
+11 verbose cwd /Users/zhangjunhuai/SHIE人寿新核心承保系统/xinhexin-salesman
+12 verbose os Darwin 25.2.0
+13 verbose node v24.13.0
+14 verbose npm  v11.6.2
+15 verbose exit 1
+16 verbose code 1
