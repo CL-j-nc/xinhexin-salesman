@@ -156,8 +156,20 @@ export function findColumnIndex(headers: string[], fieldName: string): number {
                 || cleanHeader.includes(cleanAlias);
         });
     });
-    f => !getRequiredFields().includes(f)
-    );
+}
+
+/**
+ * 获取必需字段列表
+ */
+export function getRequiredFields(): string[] {
+    return ["plate", "vin", "engineNo", "brand", "energyType"];
+}
+
+/**
+ * 获取可选字段列表
+ */
+export function getOptionalFields(): string[] {
+    return ["vehicleType", "useNature", "registerDate", "issueDate", "curbWeight", "approvedLoad", "seats"];
 }
 
 /**

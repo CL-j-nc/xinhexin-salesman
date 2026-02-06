@@ -10,6 +10,7 @@ import UseNatureSelector from "../components/UseNatureSelector";
 import CRMCustomerPicker from "../components/CRMCustomerPicker";
 import CRMVehiclePicker from "../components/CRMVehiclePicker";
 import type { CRMCustomer, CRMVehicle } from "../utils/crmStorage";
+import { getApplicableCoverages, groupCoveragesByCategory, getCoverageName, type CoverageConfig } from "../utils/coverageConfig";
 
 type Step = "vehicle" | "owner" | "proposer" | "insured" | "coverages";
 
@@ -203,149 +204,26 @@ const ApplyForm: React.FC = () => {
   }, [currentStep, vehicle, owner, proposer, insured, coverages, energyType]);
 
   const initializeCoverages = (type: EnergyType) => {
-    const isNEV = type === "NEV";
-    const prefix = isNEV ? "新能源汽车" : "机动车";
+    // 使用统一的险种配置，自动适配能源类型
+    const applicableCoverages = getApplicableCoverages(type);
 
-    const baseCoverages: CoverageItem[] = [
-      {
-        type: "damage",
-        name: `${prefix}损失保险`,
-        selected: false,
-        required: true,
-      },
-      {
-        type: "third_party",
-        name: `${prefix}第三者责任保险`,
-        amount: 1000000,
-        selected: false,
-        required: true,
-      },
-      {
-        type: "driver",
-        name: `${prefix}车上人员责任保险-驾驶人`,
-        amount: 10000,
-        selected: false,
-        required: true,
-      },
-      {
-        type: "passenger",
-        name: `${prefix}车上人员责任保险-乘客`,
-        amount: 10000,
-        selected: false,
-        required: true,
-      },
-    ];
+    const newCoverages: CoverageItem[] = applicableCoverages.map(config => ({
+      type: config.type,
+      name: getCoverageName(config, type),  // 根据能源类型获取正确的名称
+      amount: config.amount,
+      selected: config.category === "compulsory",
+      required: config.required,
+      parentType: config.parentType,
+    }));
 
-    setCoverages(baseCoverages);
+    setCoverages(newCoverages);
   };
 
+  // 当能源类型改变时重新初始化险种（简化：不需要复杂的 useEffect 逻辑）
   useEffect(() => {
     if (!energyType) return;
-
-    const isNEV = energyType === "NEV";
-    const prefix = isNEV ? "新能源汽车" : "机动车";
-
-    // Start with parent coverages only
-    let newCoverages = [...coverages.filter(c => !c.parentType)];
-
-    // Helper to find existing state for child coverages
-    const getExistingState = (type: string) => {
-      const existing = coverages.find(c => c.type === type);
-      return {
-        selected: existing ? existing.selected : false,
-        amount: existing?.amount
-      };
-    };
-
-    const damageSelected = coverages.find(c => c.type === "damage")?.selected;
-    if (damageSelected && isNEV) {
-      const hasExternalGrid = newCoverages.find(c => c.type === "external_grid");
-      if (!hasExternalGrid) {
-        const state = getExistingState("external_grid");
-        newCoverages.push({
-          type: "external_grid",
-          name: "附加外部电网故障损失险",
-          selected: state.selected,
-          amount: state.amount,
-          parentType: "damage",
-        });
-      }
-
-      const hasRescue = newCoverages.find(c => c.type === "rescue");
-      if (!hasRescue) {
-        const state = getExistingState("rescue");
-        newCoverages.push({
-          type: "rescue",
-          name: "附加新能源汽车道路救援服务特约条款",
-          selected: state.selected,
-          amount: state.amount,
-          parentType: "damage",
-        });
-      }
-
-      const hasInspection = newCoverages.find(c => c.type === "inspection");
-      if (!hasInspection) {
-        const state = getExistingState("inspection");
-        newCoverages.push({
-          type: "inspection",
-          name: "附加新能源汽车代为送检服务特约条款",
-          selected: state.selected,
-          amount: state.amount,
-          parentType: "damage",
-        });
-      }
-    }
-
-    const thirdPartySelected = coverages.find(c => c.type === "third_party")?.selected;
-    if (thirdPartySelected) {
-      const hasMedical = newCoverages.find(c => c.type === "third_party_medical");
-      if (!hasMedical) {
-        const state = getExistingState("third_party_medical");
-        newCoverages.push({
-          type: "third_party_medical",
-          name: `附加医保外医疗费用责任险（${prefix}第三者责任保险）`,
-          selected: state.selected,
-          amount: state.amount,
-          parentType: "third_party",
-        });
-      }
-    }
-
-    const driverSelected = coverages.find(c => c.type === "driver")?.selected;
-    if (driverSelected) {
-      const hasDriverMedical = newCoverages.find(c => c.type === "driver_medical");
-      if (!hasDriverMedical) {
-        const state = getExistingState("driver_medical");
-        newCoverages.push({
-          type: "driver_medical",
-          name: `附加医保外医疗费用责任险（${prefix}车上人员责任保险-驾驶人）`,
-          selected: state.selected,
-          amount: state.amount,
-          parentType: "driver",
-        });
-      }
-    }
-
-    const passengerSelected = coverages.find(c => c.type === "passenger")?.selected;
-    if (passengerSelected) {
-      const hasPassengerMedical = newCoverages.find(c => c.type === "passenger_medical");
-      if (!hasPassengerMedical) {
-        const state = getExistingState("passenger_medical");
-        newCoverages.push({
-          type: "passenger_medical",
-          name: `附加医保外医疗费用责任险（${prefix}车上人员责任保险-乘客）`,
-          selected: state.selected,
-          amount: state.amount,
-          parentType: "passenger",
-        });
-      }
-    }
-
-    // Only update if structure actually changed (prevent infinite loops)
-    if (JSON.stringify(newCoverages) !== JSON.stringify(coverages)) {
-      setCoverages(newCoverages);
-    }
-  }, [coverages.map(c => `${c.type}:${c.selected}`).join(","), energyType]);
+    initializeCoverages(energyType);
+  }, [energyType]);
 
   const handleImageUpload = async (file: File, setter: (value: string) => void) => {
     return new Promise<void>((resolve, reject) => {
