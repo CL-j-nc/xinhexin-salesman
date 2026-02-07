@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { cn } from "../utils/cn";
+import { ApiRequestError, fetchJsonWithFallback } from "../utils/apiClient";
 
 /**
  * 投保数据结构（与 ApplyForm 保持一致）
@@ -40,6 +41,16 @@ interface HistoryLoaderProps {
   onLoad: (data: ApplicationData) => void;
 }
 
+const formatApiError = (error: unknown, fallback: string): string => {
+  if (error instanceof ApiRequestError) {
+    if (error.kind === "network" || error.kind === "timeout") {
+      return `接口异常：${error.message}`;
+    }
+    return error.message || fallback;
+  }
+  return error instanceof Error ? error.message : fallback;
+};
+
 /**
  * HistoryLoader - 投保历史记录引用 / 一键导入组件
  * 
@@ -68,9 +79,11 @@ const HistoryLoader: React.FC<HistoryLoaderProps> = ({
   // 从接口获取指定投保单详情 (New Proposal)
   const loadProposalDetail = async (id: string): Promise<ApplicationData | null> => {
     try {
-      const response = await fetch(`/api/proposal/detail?id=${id}`, { method: "GET" });
-      if (!response.ok) throw new Error("获取详情失败");
-      const { data } = await response.json(); // data is the saved JSON payload
+      const response = await fetchJsonWithFallback<{ data?: any }>(
+        `/api/proposal/detail?id=${encodeURIComponent(id)}`,
+        { method: "GET" }
+      );
+      const { data } = response; // data is the saved JSON payload
       // data: { vehicle, owner, proposer, insured, coverages, energyType }
       if (!data) return null;
 
@@ -85,8 +98,8 @@ const HistoryLoader: React.FC<HistoryLoaderProps> = ({
         coverages: data.coverages,
         status: "Unknown"
       };
-    } catch (e: any) {
-      console.error("Failed to load proposal detail", e);
+    } catch (error) {
+      console.error("Failed to load proposal detail", formatApiError(error, "获取详情失败"));
       return null;
     }
   }
@@ -94,16 +107,13 @@ const HistoryLoader: React.FC<HistoryLoaderProps> = ({
   // 从接口获取指定投保单详情 (Legacy)
   const loadLegacyDetail = async (id: string): Promise<ApplicationData | null> => {
     try {
-      const response = await fetch(`/api/application/detail?id=${id}`, {
+      const res = await fetchJsonWithFallback<{ data?: any; status?: string }>(
+        `/api/application/detail?id=${encodeURIComponent(id)}`,
+        {
         method: "GET",
         headers: { "Content-Type": "application/json" },
-      });
-
-      if (!response.ok) {
-        throw new Error("获取投保详情失败");
-      }
-
-      const res = await response.json();
+        }
+      );
       const data = res.data;
       if (!data) return null;
 
@@ -118,8 +128,8 @@ const HistoryLoader: React.FC<HistoryLoaderProps> = ({
         coverages: data.coverages || [],
         status: res.status
       };
-    } catch (e: any) {
-      console.error("从接口获取历史记录失败:", e);
+    } catch (error) {
+      console.error("从接口获取历史记录失败:", formatApiError(error, "获取投保详情失败"));
       return null;
     }
   };
@@ -127,19 +137,13 @@ const HistoryLoader: React.FC<HistoryLoaderProps> = ({
   // 从接口获取历史投保列表 (Unified)
   const loadHistoryList = async (): Promise<any[]> => {
     try {
-      const response = await fetch(`/api/application/history`, {
+      const data = await fetchJsonWithFallback<any[]>(`/api/application/history`, {
         method: "GET",
         headers: { "Content-Type": "application/json" },
       });
-
-      if (!response.ok) {
-        throw new Error("获取历史投保列表失败");
-      }
-
-      const data = await response.json();
       return Array.isArray(data) ? data : [];
-    } catch (e: any) {
-      console.error("从接口获取历史投保列表失败:", e);
+    } catch (error) {
+      console.error("从接口获取历史投保列表失败:", formatApiError(error, "获取历史投保列表失败"));
       return [];
     }
   };

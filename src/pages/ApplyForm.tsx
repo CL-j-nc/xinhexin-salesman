@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useState, useEffect, useRef } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { cn } from "../utils/cn";
 import type { EnergyType } from "../utils/codec";
 import Header from "../components/Header";
@@ -10,7 +10,8 @@ import UseNatureSelector from "../components/UseNatureSelector";
 import CRMCustomerPicker from "../components/CRMCustomerPicker";
 import CRMVehiclePicker from "../components/CRMVehiclePicker";
 import type { CRMCustomer, CRMVehicle } from "../utils/crmStorage";
-import { getApplicableCoverages, groupCoveragesByCategory, getCoverageName, type CoverageConfig } from "../utils/coverageConfig";
+import { getApplicableCoverages, getCoverageName } from "../utils/coverageConfig";
+import { ApiRequestError, fetchJsonWithFallback } from "../utils/apiClient";
 
 type Step = "vehicle" | "owner" | "proposer" | "insured" | "coverages";
 
@@ -62,8 +63,40 @@ interface CoverageItem {
   parentType?: string;
 }
 
+const DEFAULT_ENERGY_TYPE: EnergyType = "FUEL";
+
+type PersistedDraft = {
+  step: Step;
+  vehicle: VehicleInfo;
+  owner: PersonInfo;
+  proposer: PersonInfo;
+  insured: PersonInfo;
+  coverages: CoverageItem[];
+  energyType: EnergyType;
+};
+
+interface DraftGetResponse {
+  success: boolean;
+  data: PersistedDraft | null;
+  updatedAt?: string;
+}
+
+interface DraftLatestResponse {
+  success: boolean;
+  data: {
+    draftId: string;
+    updatedAt?: string;
+  } | null;
+}
+
+const isEnergyType = (value: unknown): value is EnergyType =>
+  value === "FUEL" || value === "NEV";
+
+const createDraftId = (): string => `DRF-${crypto.randomUUID()}`;
+
 const ApplyForm: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [energyType, setEnergyType] = useState<EnergyType>("FUEL");
   const [currentStep, setCurrentStep] = useState<Step>("vehicle");
   const [isSameAsProposer, setIsSameAsProposer] = useState(false);
@@ -158,70 +191,205 @@ const ApplyForm: React.FC = () => {
   const [showCRMCustomerPicker, setShowCRMCustomerPicker] = useState(false);
   const [showCRMVehiclePicker, setShowCRMVehiclePicker] = useState(false);
   const [crmTargetFor, setCRMTargetFor] = useState<"owner" | "proposer" | "insured">("owner");
+  const skipNextCoverageInitRef = useRef(false);
+  const draftSaveTimerRef = useRef<number | null>(null);
+  const draftInitDoneRef = useRef(false);
+  const [draftId, setDraftId] = useState<string>("");
+  const [draftBootstrapped, setDraftBootstrapped] = useState(false);
+  const searchParamString = searchParams.toString();
 
-  // Auto-load draft data
+  // 读取 URL 中的 draftId / energyType，并从 D1 加载草稿
   useEffect(() => {
-    try {
-      const draft = sessionStorage.getItem("apply_form_draft");
-      if (draft) {
-        const parsed = JSON.parse(draft);
-        if (parsed.step) setCurrentStep(parsed.step);
-        if (parsed.vehicle) setVehicle(parsed.vehicle);
-        if (parsed.owner) setOwner(parsed.owner);
-        if (parsed.proposer) setProposer(parsed.proposer);
-        if (parsed.insured) setInsured(parsed.insured);
-        if (parsed.coverages) setCoverages(parsed.coverages);
-        if (parsed.energyType) setEnergyType(parsed.energyType);
-      } else {
-        // Only initialize default if no draft exists
-        const storedType = sessionStorage.getItem("energyType");
-        if (storedType === "NEV" || storedType === "FUEL") {
-          setEnergyType(storedType);
-          setVehicle(prev => ({ ...prev, energyType: storedType }));
-          initializeCoverages(storedType);
-        } else {
-          setEnergyType("FUEL");
-          initializeCoverages("FUEL");
+    if (draftInitDoneRef.current) return;
+    draftInitDoneRef.current = true;
+
+    let cancelled = false;
+
+    const initializeDraft = async () => {
+      const currentParams = new URLSearchParams(searchParamString);
+      const queryEnergyType = currentParams.get("energyType");
+      const initialEnergyType = isEnergyType(queryEnergyType) ? queryEnergyType : DEFAULT_ENERGY_TYPE;
+      const queryDraftId = currentParams.get("draftId")?.trim();
+      let resolvedDraftId = queryDraftId || "";
+
+      if (!resolvedDraftId) {
+        try {
+          const latestDraft = await fetchJsonWithFallback<DraftLatestResponse>(
+            "/api/proposal/draft/latest",
+            { method: "GET" }
+          );
+          resolvedDraftId = latestDraft?.data?.draftId?.trim() || "";
+        } catch (error) {
+          console.warn("Failed to load latest draft id", error);
         }
       }
-    } catch (e) {
-      console.error("Failed to load draft", e);
-    }
-  }, []);
 
-  // Auto-save draft data
-  useEffect(() => {
-    const draft = {
-      step: currentStep,
-      vehicle,
-      owner,
-      proposer,
-      insured,
-      coverages,
-      energyType
+      if (!resolvedDraftId) {
+        resolvedDraftId = createDraftId();
+      }
+
+      setDraftId(resolvedDraftId);
+
+      const nextParams = new URLSearchParams(currentParams);
+      nextParams.set("draftId", resolvedDraftId);
+      nextParams.set("energyType", initialEnergyType);
+      if (nextParams.toString() !== currentParams.toString()) {
+        setSearchParams(nextParams, { replace: true });
+      }
+
+      try {
+        const draftResp = await fetchJsonWithFallback<DraftGetResponse>(
+          `/api/proposal/draft?id=${encodeURIComponent(resolvedDraftId)}`,
+          { method: "GET" }
+        );
+
+        if (cancelled) return;
+
+	        const serverDraft = draftResp?.data;
+	        if (serverDraft) {
+	          const resolvedEnergyType = isEnergyType(serverDraft.energyType)
+	            ? serverDraft.energyType
+	            : initialEnergyType;
+
+	          if (Array.isArray(serverDraft.coverages) && serverDraft.coverages.length > 0) {
+	            skipNextCoverageInitRef.current = true;
+	          }
+	          if (serverDraft.step) setCurrentStep(serverDraft.step);
+	          if (serverDraft.vehicle) {
+	            setVehicle({ ...serverDraft.vehicle, energyType: resolvedEnergyType });
+	          } else {
+	            setVehicle(prev => ({ ...prev, energyType: resolvedEnergyType }));
+	          }
+	          if (serverDraft.owner) setOwner(serverDraft.owner);
+	          if (serverDraft.proposer) setProposer(serverDraft.proposer);
+	          if (serverDraft.insured) setInsured(serverDraft.insured);
+	          setCoverages(mergePersistedCoverages(resolvedEnergyType, serverDraft.coverages));
+	          setEnergyType(resolvedEnergyType);
+	        } else {
+	          setEnergyType(initialEnergyType);
+	          setVehicle(prev => ({ ...prev, energyType: initialEnergyType }));
+	          initializeCoverages(initialEnergyType);
+	        }
+      } catch (error) {
+        if (cancelled) return;
+        console.error("Failed to load cloud draft", error);
+        setEnergyType(initialEnergyType);
+        setVehicle(prev => ({ ...prev, energyType: initialEnergyType }));
+        initializeCoverages(initialEnergyType);
+      } finally {
+        if (!cancelled) {
+          setDraftBootstrapped(true);
+        }
+      }
     };
-    sessionStorage.setItem("apply_form_draft", JSON.stringify(draft));
-  }, [currentStep, vehicle, owner, proposer, insured, coverages, energyType]);
 
-  const initializeCoverages = (type: EnergyType) => {
-    // 使用统一的险种配置，自动适配能源类型
+    initializeDraft();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [searchParamString, setSearchParams]);
+
+  // 自动保存草稿到 D1（不落本地）
+  useEffect(() => {
+    if (!draftBootstrapped || !draftId) return;
+
+    if (draftSaveTimerRef.current) {
+      window.clearTimeout(draftSaveTimerRef.current);
+    }
+
+    draftSaveTimerRef.current = window.setTimeout(async () => {
+      const draftPayload: PersistedDraft = {
+        step: currentStep,
+        vehicle,
+        owner,
+        proposer,
+        insured,
+        coverages,
+        energyType,
+      };
+
+      try {
+        await fetchJsonWithFallback("/api/proposal/draft/upsert", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            draftId,
+            data: draftPayload,
+          }),
+        });
+      } catch (error) {
+        console.error("Failed to save cloud draft", error);
+      }
+    }, 600);
+
+    return () => {
+      if (draftSaveTimerRef.current) {
+        window.clearTimeout(draftSaveTimerRef.current);
+      }
+    };
+  }, [draftBootstrapped, draftId, currentStep, vehicle, owner, proposer, insured, coverages, energyType]);
+
+  const buildCoveragesForEnergyType = (type: EnergyType): CoverageItem[] => {
     const applicableCoverages = getApplicableCoverages(type);
 
-    const newCoverages: CoverageItem[] = applicableCoverages.map(config => ({
+    return applicableCoverages.map(config => ({
       type: config.type,
-      name: getCoverageName(config, type),  // 根据能源类型获取正确的名称
+      name: getCoverageName(config, type), // 根据能源类型获取正确的名称
       amount: config.amount,
-      selected: config.category === "compulsory",
+      selected: false,
       required: config.required,
       parentType: config.parentType,
     }));
+  };
 
-    setCoverages(newCoverages);
+  // Merge persisted coverages with the current config list:
+  // - Drops removed/unknown types (e.g. legacy "compulsory")
+  // - Ensures main coverages (damage/third_party/driver/passenger) always exist as candidates
+  const mergePersistedCoverages = (type: EnergyType, persisted: unknown): CoverageItem[] => {
+    const base = buildCoveragesForEnergyType(type);
+
+    if (!Array.isArray(persisted)) return base;
+
+    const byType = new Map<string, any>();
+    for (const item of persisted) {
+      if (!item || typeof item !== "object") continue;
+      const coverageType = (item as any).type;
+      if (typeof coverageType === "string" && coverageType.trim()) {
+        byType.set(coverageType, item);
+      }
+    }
+
+    return base.map(item => {
+      const persistedItem = byType.get(item.type);
+      if (!persistedItem) return item;
+
+      const selected = typeof persistedItem.selected === "boolean"
+        ? persistedItem.selected
+        : Boolean(persistedItem.selected);
+
+      const rawAmount = persistedItem.amount;
+      const parsedAmount = typeof rawAmount === "number" ? rawAmount : Number(rawAmount);
+
+      return {
+        ...item,
+        selected,
+        amount: Number.isFinite(parsedAmount) ? parsedAmount : item.amount,
+      };
+    });
+  };
+
+  const initializeCoverages = (type: EnergyType) => {
+    setCoverages(buildCoveragesForEnergyType(type));
   };
 
   // 当能源类型改变时重新初始化险种（简化：不需要复杂的 useEffect 逻辑）
   useEffect(() => {
     if (!energyType) return;
+    if (skipNextCoverageInitRef.current) {
+      skipNextCoverageInitRef.current = false;
+      return;
+    }
     initializeCoverages(energyType);
   }, [energyType]);
 
@@ -288,26 +456,23 @@ const ApplyForm: React.FC = () => {
       };
 
       // 调用 API 保存到 KV（核保端需要读取这个数据）
-      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
-      const response = await fetch(`${API_BASE_URL}/api/policy.salesman`, {
+      const result = await fetchJsonWithFallback<{ proposalId: string }>("/api/policy.salesman", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(applicationData),
       });
 
-      if (!response.ok) {
-        const errorResult = await response.json().catch(() => ({ error: "请求处理失败" }));
-        throw new Error(errorResult.error || `服务器错误: ${response.status}`);
+      // 提交成功后跳转状态页
+      navigate(`/status?id=${encodeURIComponent(result.proposalId)}`);
+    } catch (error) {
+      if (error instanceof ApiRequestError) {
+        const prefix = error.kind === "network" || error.kind === "timeout"
+          ? "服务连接失败"
+          : "提交失败";
+        alert(`${prefix}：${error.message}`);
+      } else {
+        alert(error instanceof Error ? error.message : "提交失败，请重试");
       }
-
-      const result = await response.json();
-      // 存储 application ID 并跳转到状态页
-      // 提交成功后清除草稿
-      sessionStorage.removeItem("apply_form_draft");
-      sessionStorage.setItem("applicationId", result.proposalId);
-      navigate("/status");
-    } catch (error: any) {
-      alert(error.message || "提交失败，请重试");
     } finally {
       setSubmitting(false);
     }
@@ -895,7 +1060,11 @@ const ApplyForm: React.FC = () => {
         {currentStep === "coverages" && (
           <div className="bg-white rounded-xl shadow-sm">
             <div className="p-4 space-y-3">
-              {coverages.filter(c => c.required).map(coverage => (
+              <div className="pt-1">
+                <h4 className="text-xs font-bold text-gray-500 mb-2">主险</h4>
+              </div>
+
+              {coverages.filter(c => !c.parentType).map(coverage => (
                 <div key={coverage.type} className="border-b border-gray-100 pb-3">
                   <label className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
@@ -1018,12 +1187,21 @@ const ApplyForm: React.FC = () => {
         visible={showHistoryLoader}
         onClose={() => setShowHistoryLoader(false)}
         onLoad={(app) => {
-          setVehicle(app.vehicle);
+          const resolvedEnergyType = isEnergyType(app.energyType) ? app.energyType : DEFAULT_ENERGY_TYPE;
+
+          // Prevent the energyType effect from overwriting imported selections.
+          skipNextCoverageInitRef.current = true;
+
+          if (app.vehicle) {
+            setVehicle({ ...app.vehicle, energyType: resolvedEnergyType });
+          } else {
+            setVehicle(prev => ({ ...prev, energyType: resolvedEnergyType }));
+          }
           setOwner(app.owner);
           setProposer(app.proposer);
           setInsured(app.insured);
-          setCoverages(app.coverages);
-          setEnergyType(app.energyType);
+          setCoverages(mergePersistedCoverages(resolvedEnergyType, app.coverages));
+          setEnergyType(resolvedEnergyType);
           alert("历史投保信息已导入");
         }}
       />

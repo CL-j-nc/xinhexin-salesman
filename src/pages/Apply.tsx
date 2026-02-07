@@ -9,8 +9,7 @@ const Apply: React.FC = () => {
   const [showExportImport, setShowExportImport] = useState(false);
 
   const handleEnergySelection = (energyType: "NEV" | "FUEL") => {
-    sessionStorage.setItem("energyType", energyType);
-    navigate("/apply");
+    navigate(`/apply?energyType=${energyType}`);
   };
 
   return (

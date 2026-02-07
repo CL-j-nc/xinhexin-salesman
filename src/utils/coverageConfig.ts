@@ -12,7 +12,7 @@ export interface CoverageConfig {
     label: string;  // 标准标签
     amount?: number;
     required?: boolean;
-    category: "compulsory" | "basic" | "additional";
+    category: "basic" | "additional";
     applicableTo: ("FUEL" | "NEV" | "both")[];
     description?: string;
     parentType?: string; // 用于指定附加险的父险种
@@ -27,26 +27,11 @@ export function getCoverageName(config: CoverageConfig, energyType: "FUEL" | "NE
 
 /**
  * 险种分类：
- * - compulsory: 强制险（交强险）
  * - basic: 主要险种（车损、第三者等）
  * - additional: 附加险
  */
 
 export const COVERAGE_CONFIGS: Record<string, CoverageConfig> = {
-    // ========== 强制险 ==========
-    compulsory: {
-        type: "compulsory",
-        nameByEnergyType: {
-            FUEL: "交强险",
-            NEV: "交强险",
-        },
-        label: "机动车交通事故责任强制保险",
-        required: true,
-        category: "compulsory",
-        applicableTo: ["FUEL", "NEV"],
-        description: "法律强制性保险，必须购买",
-    },
-
     // ========== 基础险种 ==========
     damage: {
         type: "damage",
@@ -282,20 +267,20 @@ export function getApplicableCoverages(energyType: "FUEL" | "NEV"): CoverageConf
 }
 
 /**
- * 获取必需险种（强制和基础）
+ * 获取必需险种（required）
  */
 export function getRequiredCoverages(energyType: "FUEL" | "NEV"): CoverageConfig[] {
     return getApplicableCoverages(energyType).filter(
-        config => config.required || config.category === "compulsory"
+        config => Boolean(config.required)
     );
 }
 
 /**
- * 获取可选附加险
+ * 获取可选险种（非 required）
  */
 export function getOptionalCoverages(energyType: "FUEL" | "NEV"): CoverageConfig[] {
     return getApplicableCoverages(energyType).filter(
-        config => !config.required && config.category !== "compulsory"
+        config => !config.required
     );
 }
 
@@ -307,7 +292,6 @@ export function groupCoveragesByCategory(
 ): Record<string, CoverageConfig[]> {
     const coverages = getApplicableCoverages(energyType);
     const grouped: Record<string, CoverageConfig[]> = {
-        compulsory: [],
         basic: [],
         additional: [],
     };

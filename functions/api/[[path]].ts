@@ -32,6 +32,18 @@ export const onRequest: PagesFunction<Env> = async ({ request, env, params }) =>
 
   const relativePath = `/api/${path}${url.search}`;
 
+  if (url.searchParams.has("__debug")) {
+    return new Response(
+      JSON.stringify({
+        paramsPath: params.path ?? null,
+        pathSegments,
+        relativePath,
+        hasBinding: Boolean(env.XINHEXIN_API),
+      }),
+      { headers: { "Content-Type": "application/json" } }
+    );
+  }
+
   if (env.XINHEXIN_API) {
     const boundRequest = new Request(`https://xinhexin-api.internal${relativePath}`, init);
     return env.XINHEXIN_API.fetch(boundRequest);

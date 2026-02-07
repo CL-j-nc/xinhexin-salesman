@@ -6,6 +6,7 @@
 
 import type { CRMVehicle, CRMCustomer } from "./crmStorage";
 import { crmDataSource } from "./crmDataSource";
+import { ApiRequestError, getApiBases } from "./apiClient";
 import {
     validateAndMapColumns,
     vehicleFieldMappings,
@@ -158,13 +159,128 @@ export const downloadCustomersCSV = async (): Promise<void> => {
     downloadCSV(csv, `CRM客户档案_${date}.csv`);
 };
 
+/**
+ * 生成 CRM 车辆导入样表（CSV）
+ * 导入前可先下载该模板，按列填充后再导入。
+ */
+export const exportVehiclesImportTemplateCSV = (): string => {
+    const headers = [
+        "车牌号",
+        "车架号",
+        "发动机号",
+        "品牌型号",
+        "车辆类型",
+        "使用性质",
+        "注册日期",
+        "发证日期",
+        "整备质量",
+        "核定载质量",
+        "座位数",
+        "能源类型",
+        "车主",
+        "手机号",
+        "身份证"
+    ];
+
+    const sampleRow = [
+        "粤B12345",
+        "LNBSCQDK2GX123456",
+        "E1234567",
+        "比亚迪 秦PLUS DM-i",
+        "客车",
+        "家庭自用",
+        "2023-05-18",
+        "2023-05-20",
+        "1460",
+        "375",
+        "5",
+        "新能源",
+        "张三",
+        "13800001234",
+        "440101199001010011"
+    ];
+
+    return [
+        headers.join(","),
+        sampleRow.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(","),
+    ].join("\n");
+};
+
+/**
+ * 下载 CRM 车辆导入样表（CSV）
+ */
+export const downloadVehiclesImportTemplateCSV = (): void => {
+    const content = exportVehiclesImportTemplateCSV();
+    const date = new Date().toISOString().split("T")[0];
+    downloadCSV(content, `CRM车辆导入样表_${date}.csv`);
+};
+
 // ==================== 导入功能 ====================
 
-interface ImportResult {
+export interface ImportResult {
     success: boolean;
     imported: number;
     errors: string[];
+    diagnostics?: string[];
 }
+
+const getImportedCount = (payload: unknown): number => {
+    if (Array.isArray(payload)) return payload.length;
+    if (payload && typeof payload === "object") {
+        const imported = (payload as { imported?: unknown }).imported;
+        if (typeof imported === "number" && imported >= 0) return imported;
+    }
+    return 0;
+};
+
+const buildHealthCheckFailure = (reason?: string): ImportResult => ({
+    success: false,
+    imported: 0,
+    errors: [
+        `API 健康检查失败：${reason || "未检测到可用后端服务"}`,
+        "请检查后端 Worker 是否在线，或确认前端环境变量 VITE_API_BASE_URL 是否正确。",
+    ],
+    diagnostics: [
+        `候选 API 域名: ${getApiBases().join(" -> ")}`,
+    ],
+});
+
+const mapImportApiError = (error: unknown): { message: string; diagnostics: string[] } => {
+    if (error instanceof ApiRequestError) {
+        const diagnostics: string[] = [];
+        if (error.url) diagnostics.push(`请求地址: ${error.url}`);
+        if (typeof error.status === "number") diagnostics.push(`HTTP 状态: ${error.status}`);
+        if (error.responseText) diagnostics.push(`响应片段: ${error.responseText.slice(0, 200)}`);
+
+        if (error.kind === "network" || error.kind === "timeout") {
+            return {
+                message: `API 不可达：${error.message}`,
+                diagnostics: diagnostics.length > 0 ? diagnostics : [`候选 API 域名: ${getApiBases().join(" -> ")}`],
+            };
+        }
+        if (error.kind === "parse") {
+            return {
+                message: "接口响应格式异常",
+                diagnostics,
+            };
+        }
+        return {
+            message: error.message || "请求失败",
+            diagnostics,
+        };
+    }
+
+    return {
+        message: error instanceof Error ? error.message : "未知错误",
+        diagnostics: [],
+    };
+};
+
+const ensureApiReady = async (): Promise<ImportResult | null> => {
+    const health = await crmDataSource.checkHealth();
+    if (health.ok) return null;
+    return buildHealthCheckFailure(health.reason);
+};
 
 /**
  * 解析 CSV 内容
@@ -207,6 +323,9 @@ export const importVehiclesFromCSV = async (csvContent: string): Promise<ImportR
     const result: ImportResult = { success: true, imported: 0, errors: [] };
 
     try {
+        const healthError = await ensureApiReady();
+        if (healthError) return healthError;
+
         const rows = parseCSV(csvContent);
         if (rows.length < 2) {
             return { success: false, imported: 0, errors: ["CSV 文件为空或格式错误"] };
@@ -290,9 +409,13 @@ export const importVehiclesFromCSV = async (csvContent: string): Promise<ImportR
         if (vehiclesToImport.length > 0) {
             try {
                 const imported = await crmDataSource.bulkAddVehicles(vehiclesToImport);
-                result.imported = imported.length;
-            } catch (e: any) {
-                result.errors.push(`批量导入失败：${e.message}`);
+                result.imported = getImportedCount(imported);
+            } catch (error) {
+                const mapped = mapImportApiError(error);
+                result.errors.push(`批量导入失败：${mapped.message}`);
+                if (mapped.diagnostics.length > 0) {
+                    result.diagnostics = mapped.diagnostics;
+                }
                 result.success = false;
             }
         }
@@ -313,17 +436,23 @@ import { mockVehicles } from "./mockCRMData";
 
 export const importTestVehicles = async (): Promise<ImportResult> => {
     try {
+        const healthError = await ensureApiReady();
+        if (healthError) return healthError;
+
         const imported = await crmDataSource.bulkAddVehicles(mockVehicles);
+        const importedCount = getImportedCount(imported);
         return {
             success: true,
-            imported: imported.length,
+            imported: importedCount,
             errors: []
         };
-    } catch (e: any) {
+    } catch (error) {
+        const mapped = mapImportApiError(error);
         return {
             success: false,
             imported: 0,
-            errors: [`测试数据导入失败: ${e.message}`]
+            errors: [`测试数据导入失败: ${mapped.message}`],
+            diagnostics: mapped.diagnostics
         };
     }
 };

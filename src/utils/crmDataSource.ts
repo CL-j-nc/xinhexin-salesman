@@ -1,7 +1,5 @@
 import type { CRMCustomer, CRMVehicle } from "./crmStorage";
-
-// API 基础地址 - 从环境变量读取，或使用默认值
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "https://xinhexin-api.chinalife-shiexinhexin.workers.dev";
+import { ApiRequestError, fetchJsonWithFallback, probeApiHealth } from "./apiClient";
 
 // 扩展数据类型 - 生产环境专用
 export interface VehicleProfile {
@@ -71,6 +69,20 @@ export interface FlagInput {
     createdBy: string;
 }
 
+export interface CRMHealthResult {
+    ok: boolean;
+    baseUrl?: string;
+    reason?: string;
+}
+
+const isNotFound = (error: unknown): boolean =>
+    error instanceof ApiRequestError && error.kind === "http" && error.status === 404;
+
+const toApiError = (error: unknown): ApiRequestError =>
+    error instanceof ApiRequestError
+        ? error
+        : new ApiRequestError({ kind: "network", message: "网络请求失败", cause: error });
+
 // 统一数据源接口
 export interface CRMDataSource {
     // 客户相关
@@ -84,6 +96,9 @@ export interface CRMDataSource {
     getVehicle(plateOrVin: string): Promise<CRMVehicle | null>;
     addVehicle(vehicle: Omit<CRMVehicle, "id" | "createdAt" | "usageCount">): Promise<CRMVehicle>;
     updateVehicleUsage(id: string): Promise<void>;
+
+    // 健康检查
+    checkHealth(): Promise<CRMHealthResult>;
 
     // 生产环境专用功能
     getVehicleProfile(plateOrVin: string): Promise<VehicleProfile | null>;
@@ -100,119 +115,117 @@ export interface CRMDataSource {
  * 不允许任何本地存储回退
  */
 class DatabaseSource implements CRMDataSource {
-    private baseUrl: string;
+    private async requestJson<T>(path: string, init: RequestInit = {}): Promise<T> {
+        return fetchJsonWithFallback<T>(path, init);
+    }
 
-    constructor(baseUrl: string = "") {
-        this.baseUrl = baseUrl;
+    private async requestWithoutBody(path: string, init: RequestInit = {}): Promise<void> {
+        await fetchJsonWithFallback(path, init, { expectJson: false });
     }
 
     async searchCustomers(query: string): Promise<CRMCustomer[]> {
-        const response = await fetch(`${this.baseUrl}/api/crm/customers?q=${encodeURIComponent(query)}`);
-        if (!response.ok) throw new Error("Database query failed");
-        return response.json();
+        return this.requestJson<CRMCustomer[]>(`/api/crm/customers?q=${encodeURIComponent(query)}`);
     }
 
     async getCustomer(id: string): Promise<CRMCustomer | null> {
-        const response = await fetch(`${this.baseUrl}/api/crm/customers/${id}`);
-        if (response.status === 404) return null;
-        if (!response.ok) throw new Error("Database query failed");
-        return response.json();
+        try {
+            return await this.requestJson<CRMCustomer>(`/api/crm/customers/${id}`);
+        } catch (error) {
+            if (isNotFound(error)) return null;
+            throw error;
+        }
     }
 
     async addCustomer(customer: Omit<CRMCustomer, "id" | "createdAt" | "usageCount">): Promise<CRMCustomer> {
-        const response = await fetch(`${this.baseUrl}/api/crm/customers`, {
+        return this.requestJson<CRMCustomer>("/api/crm/customers", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(customer),
         });
-        if (!response.ok) throw new Error("Failed to add customer");
-        return response.json();
     }
 
     async updateCustomerUsage(id: string): Promise<void> {
-        await fetch(`${this.baseUrl}/api/crm/customers/${id}/usage`, {
+        await this.requestWithoutBody(`/api/crm/customers/${id}/usage`, {
             method: "POST",
         });
     }
 
     async searchVehicles(query: string): Promise<CRMVehicle[]> {
-        const response = await fetch(`${this.baseUrl}/api/crm/vehicles?q=${encodeURIComponent(query)}`);
-        if (!response.ok) throw new Error("Database query failed");
-        return response.json();
+        return this.requestJson<CRMVehicle[]>(`/api/crm/vehicles?q=${encodeURIComponent(query)}`);
     }
 
     async getVehicle(plateOrVin: string): Promise<CRMVehicle | null> {
-        const response = await fetch(`${this.baseUrl}/api/crm/vehicles/${encodeURIComponent(plateOrVin)}`);
-        if (response.status === 404) return null;
-        if (!response.ok) throw new Error("Database query failed");
-        return response.json();
+        try {
+            return await this.requestJson<CRMVehicle>(`/api/crm/vehicles/${encodeURIComponent(plateOrVin)}`);
+        } catch (error) {
+            if (isNotFound(error)) return null;
+            throw error;
+        }
     }
 
     async addVehicle(vehicle: Omit<CRMVehicle, "id" | "createdAt" | "usageCount">): Promise<CRMVehicle> {
-        const response = await fetch(`${this.baseUrl}/api/crm/vehicles`, {
+        return this.requestJson<CRMVehicle>("/api/crm/vehicles", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(vehicle),
         });
-        if (!response.ok) throw new Error("Failed to add vehicle");
-        return response.json();
     }
 
     async updateVehicleUsage(id: string): Promise<void> {
-        await fetch(`${this.baseUrl}/api/crm/vehicles/${id}/usage`, {
+        await this.requestWithoutBody(`/api/crm/vehicles/${id}/usage`, {
             method: "POST",
         });
     }
 
+    async checkHealth(): Promise<CRMHealthResult> {
+        return probeApiHealth();
+    }
+
     async getVehicleProfile(plateOrVin: string): Promise<VehicleProfile | null> {
-        // 使用规范路径 /api/crm/by-vehicle
-        const response = await fetch(`${this.baseUrl}/api/crm/by-vehicle?plate=${encodeURIComponent(plateOrVin)}`);
-        if (response.status === 404) return null;
-        if (!response.ok) throw new Error("Database query failed");
-        const data = await response.json();
-        if (!data || !data.vehicle_policy_uid) return null;
-        // 转换snake_case到camelCase
-        return {
-            vehiclePolicyUid: data.vehicle_policy_uid,
-            plate: data.plate,
-            vin: data.vin,
-            currentStatus: data.current_status || "ACTIVE",
-            lastContactTime: data.last_contact_time,
-            contacts: (data.contacts || []).map((c: any) => ({
-                contactId: c.contact_id,
-                roleType: c.role_type,
-                name: c.name,
-                idType: c.id_type,
-                idNo: c.id_no,
-                phone: c.phone
-            })),
-            flags: (data.flags || []).map((f: any) => ({
-                flagId: f.flag_id,
-                flagType: f.flag_type,
-                flagNote: f.flag_note,
-                isActive: f.is_active === 1,
-                createdAt: f.created_at,
-                createdBy: f.created_by
-            }))
-        };
+        try {
+            const data = await this.requestJson<any>(`/api/crm/by-vehicle?plate=${encodeURIComponent(plateOrVin)}`);
+            if (!data || Array.isArray(data) || !data.vehicle_policy_uid) return null;
+
+            // 转换 snake_case 到 camelCase
+            return {
+                vehiclePolicyUid: data.vehicle_policy_uid,
+                plate: data.plate,
+                vin: data.vin,
+                currentStatus: data.current_status || "ACTIVE",
+                lastContactTime: data.last_contact_time,
+                contacts: (data.contacts || []).map((c: any) => ({
+                    contactId: c.contact_id,
+                    roleType: c.role_type,
+                    name: c.name,
+                    idType: c.id_type,
+                    idNo: c.id_no,
+                    phone: c.phone,
+                })),
+                flags: (data.flags || []).map((f: any) => ({
+                    flagId: f.flag_id,
+                    flagType: f.flag_type,
+                    flagNote: f.flag_note,
+                    isActive: f.is_active === 1,
+                    createdAt: f.created_at,
+                    createdBy: f.created_by,
+                })),
+            };
+        } catch (error) {
+            if (isNotFound(error)) return null;
+            throw error;
+        }
     }
 
     async getTimeline(vehicleUid: string): Promise<TimelineEvent[]> {
-        // 使用规范路径 /api/crm/timeline
-        const response = await fetch(`${this.baseUrl}/api/crm/timeline?vehicle_policy_uid=${vehicleUid}`);
-        if (!response.ok) throw new Error("Database query failed");
-        return response.json();
+        return this.requestJson<TimelineEvent[]>(`/api/crm/timeline?vehicle_policy_uid=${vehicleUid}`);
     }
 
     async getInteractions(vehicleUid: string): Promise<Interaction[]> {
-        const response = await fetch(`${this.baseUrl}/api/crm/vehicle/${vehicleUid}/interactions`);
-        if (!response.ok) throw new Error("Database query failed");
-        return response.json();
+        return this.requestJson<Interaction[]>(`/api/crm/vehicle/${vehicleUid}/interactions`);
     }
 
     async addInteraction(interaction: InteractionInput): Promise<Interaction> {
-        // 使用规范路径 /api/crm/interaction/add
-        const response = await fetch(`${this.baseUrl}/api/crm/interaction/add`, {
+        return this.requestJson<Interaction>("/api/crm/interaction/add", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -221,65 +234,77 @@ class DatabaseSource implements CRMDataSource {
                 topic: interaction.topic,
                 result: interaction.result,
                 follow_up_status: interaction.followUpStatus,
-                operator_name: interaction.operatorName
+                operator_name: interaction.operatorName,
             }),
         });
-        if (!response.ok) throw new Error("Failed to add interaction");
-        return response.json();
     }
 
     async getFlags(vehicleUid: string): Promise<Flag[]> {
-        const response = await fetch(`${this.baseUrl}/api/crm/vehicle/${vehicleUid}/flags`);
-        if (!response.ok) throw new Error("Database query failed");
-        return response.json();
+        return this.requestJson<Flag[]>(`/api/crm/vehicle/${vehicleUid}/flags`);
     }
 
     async addFlag(flag: FlagInput): Promise<Flag> {
-        // 使用规范路径 /api/crm/flag/add
-        const response = await fetch(`${this.baseUrl}/api/crm/flag/add`, {
+        return this.requestJson<Flag>("/api/crm/flag/add", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
                 vehicle_policy_uid: flag.vehiclePolicyUid,
                 flag_type: flag.flagType,
                 flag_note: flag.flagNote,
-                created_by: flag.createdBy
+                created_by: flag.createdBy,
             }),
         });
-        if (!response.ok) throw new Error("Failed to add flag");
-        return response.json();
     }
 
-    // 批量添加车辆（用于CSV导入）
+    // 批量添加车辆（用于 CSV 导入）
     async bulkAddVehicles(vehicles: Omit<CRMVehicle, "id" | "createdAt" | "usageCount">[]): Promise<CRMVehicle[]> {
-        const response = await fetch(`${this.baseUrl}/api/crm/vehicles/bulk`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ vehicles }),
-        });
-        if (!response.ok) throw new Error("Failed to bulk add vehicles");
-        return response.json();
+        try {
+            return await this.requestJson<CRMVehicle[]>("/api/crm/vehicles/bulk", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ vehicles }),
+            });
+        } catch (error) {
+            const apiError = toApiError(error);
+
+            if (apiError.kind === "network" || apiError.kind === "timeout") {
+                throw new ApiRequestError({
+                    kind: apiError.kind,
+                    message: "API 不可达，请检查后端服务与域名配置",
+                    url: apiError.url,
+                    cause: apiError,
+                });
+            }
+
+            if (apiError.kind === "parse") {
+                throw new ApiRequestError({
+                    kind: "parse",
+                    message: "接口响应格式异常",
+                    url: apiError.url,
+                    responseText: apiError.responseText,
+                    cause: apiError,
+                });
+            }
+
+            throw apiError;
+        }
     }
 
-    // 获取所有车辆（用于CSV导出）
+    // 获取所有车辆（用于 CSV 导出）
     async getAllVehicles(): Promise<CRMVehicle[]> {
-        const response = await fetch(`${this.baseUrl}/api/crm/vehicles`);
-        if (!response.ok) throw new Error("Database query failed");
-        return response.json();
+        return this.requestJson<CRMVehicle[]>("/api/crm/vehicles");
     }
 
-    // 获取所有客户（用于CSV导出）
+    // 获取所有客户（用于 CSV 导出）
     async getAllCustomers(): Promise<CRMCustomer[]> {
-        const response = await fetch(`${this.baseUrl}/api/crm/customers`);
-        if (!response.ok) throw new Error("Database query failed");
-        return response.json();
+        return this.requestJson<CRMCustomer[]>("/api/crm/customers");
     }
 
-    // 工具方法：获取当前模式（始终为database）
+    // 工具方法：获取当前模式（始终为 database）
     getCurrentMode(): "database" {
         return "database";
     }
 }
 
 // 导出单例 - 仅使用数据库源
-export const crmDataSource = new DatabaseSource(API_BASE);
+export const crmDataSource = new DatabaseSource();

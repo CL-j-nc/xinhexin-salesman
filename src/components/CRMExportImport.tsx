@@ -1,11 +1,14 @@
-import React, { useState, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { cn } from "../utils/cn";
 import {
     downloadVehiclesCSV,
     downloadCustomersCSV,
+    downloadVehiclesImportTemplateCSV,
     handleFileImport,
     importTestVehicles,
+    type ImportResult,
 } from "../utils/crmExportImport";
+import { crmDataSource } from "../utils/crmDataSource";
 
 interface CRMExportImportProps {
     visible: boolean;
@@ -22,10 +25,72 @@ const CRMExportImport: React.FC<CRMExportImportProps> = ({
     const [importResult, setImportResult] = useState<{
         success: boolean;
         message: string;
+        diagnostics?: string[];
     } | null>(null);
+    const [apiStatus, setApiStatus] = useState<{
+        loading: boolean;
+        ok: boolean;
+        baseUrl?: string;
+        reason?: string;
+    }>({
+        loading: false,
+        ok: false,
+    });
     const fileInputRef = useRef<HTMLInputElement>(null);
 
+    useEffect(() => {
+        if (!visible) return;
+        let cancelled = false;
+
+        const checkApiHealth = async () => {
+            setApiStatus({
+                loading: true,
+                ok: false,
+            });
+            try {
+                const result = await crmDataSource.checkHealth();
+                if (cancelled) return;
+                setApiStatus({
+                    loading: false,
+                    ok: result.ok,
+                    baseUrl: result.baseUrl,
+                    reason: result.reason,
+                });
+            } catch (error) {
+                if (cancelled) return;
+                setApiStatus({
+                    loading: false,
+                    ok: false,
+                    reason: error instanceof Error ? error.message : "健康检查失败",
+                });
+            }
+        };
+
+        checkApiHealth();
+        return () => {
+            cancelled = true;
+        };
+    }, [visible]);
+
     if (!visible) return null;
+
+    const importUnavailable = importing || apiStatus.loading || !apiStatus.ok;
+    const applyImportResult = (result: ImportResult, successPrefix: string) => {
+        if (result.success) {
+            setImportResult({
+                success: true,
+                message: `${successPrefix} ${result.imported} 条`,
+            });
+            onImportComplete?.();
+            return;
+        }
+
+        setImportResult({
+            success: false,
+            message: `导入失败：${result.errors.join("; ")}`,
+            diagnostics: result.diagnostics,
+        });
+    };
 
     const handleExportVehicles = () => {
         downloadVehiclesCSV();
@@ -38,7 +103,16 @@ const CRMExportImport: React.FC<CRMExportImportProps> = ({
     };
 
     const handleImportClick = () => {
+        if (importUnavailable) return;
         fileInputRef.current?.click();
+    };
+
+    const handleDownloadTemplate = () => {
+        downloadVehiclesImportTemplateCSV();
+        setImportResult({
+            success: true,
+            message: "已下载 CRM 导入样表，请按样表列名填写后再导入",
+        });
     };
 
     const handleImportTestVehicles = async () => {
@@ -48,18 +122,7 @@ const CRMExportImport: React.FC<CRMExportImportProps> = ({
         const result = await importTestVehicles();
         setImporting(false);
 
-        if (result.success) {
-            setImportResult({
-                success: true,
-                message: `成功导入 ${result.imported} 条测试数据`,
-            });
-            onImportComplete?.();
-        } else {
-            setImportResult({
-                success: false,
-                message: `导入失败：${result.errors.join("; ")}`,
-            });
-        }
+        applyImportResult(result, "成功导入测试数据");
     };
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -71,18 +134,7 @@ const CRMExportImport: React.FC<CRMExportImportProps> = ({
 
         handleFileImport(file, "vehicles", (result) => {
             setImporting(false);
-            if (result.success) {
-                setImportResult({
-                    success: true,
-                    message: `成功导入 ${result.imported} 条车辆数据`,
-                });
-                onImportComplete?.();
-            } else {
-                setImportResult({
-                    success: false,
-                    message: `导入失败：${result.errors.join("; ")}`,
-                });
-            }
+            applyImportResult(result, "成功导入车辆数据");
         });
 
         // 清空文件选择
@@ -104,6 +156,25 @@ const CRMExportImport: React.FC<CRMExportImportProps> = ({
 
                 {/* 内容 */}
                 <div className="p-4 space-y-4">
+                    {/* API 状态 */}
+                    <div
+                        className={cn(
+                            "rounded-lg border px-3 py-2 text-sm",
+                            apiStatus.loading && "border-slate-200 bg-slate-50 text-slate-600",
+                            !apiStatus.loading && apiStatus.ok && "border-emerald-200 bg-emerald-50 text-emerald-700",
+                            !apiStatus.loading && !apiStatus.ok && "border-red-200 bg-red-50 text-red-700"
+                        )}
+                    >
+                        {apiStatus.loading && "正在检查后端 API 状态..."}
+                        {!apiStatus.loading && apiStatus.ok && `API 在线：${apiStatus.baseUrl || "已连接"}`}
+                        {!apiStatus.loading && !apiStatus.ok && `API 异常：${apiStatus.reason || "后端服务不可达"}`}
+                    </div>
+                    {!apiStatus.loading && !apiStatus.ok && (
+                        <p className="text-xs text-red-600">
+                            当前已禁用导入功能。请检查 `VITE_API_BASE_URL` 配置与后端 Worker 运行状态。
+                        </p>
+                    )}
+
                     {/* 导出区域 */}
                     <div className="space-y-2">
                         <h3 className="text-sm font-bold text-gray-700">📤 导出数据</h3>
@@ -129,6 +200,12 @@ const CRMExportImport: React.FC<CRMExportImportProps> = ({
                     {/* 导入区域 */}
                     <div className="space-y-2">
                         <h3 className="text-sm font-bold text-gray-700">📥 导入数据</h3>
+                        <button
+                            onClick={handleDownloadTemplate}
+                            className="w-full py-2 px-4 bg-emerald-50 text-emerald-700 rounded-lg hover:bg-emerald-100 transition-colors text-sm font-medium"
+                        >
+                            下载 CRM 导入样表（CSV）
+                        </button>
                         <input
                             ref={fileInputRef}
                             type="file"
@@ -138,16 +215,16 @@ const CRMExportImport: React.FC<CRMExportImportProps> = ({
                         />
                         <button
                             onClick={handleImportClick}
-                            disabled={importing}
+                            disabled={importUnavailable}
                             className={cn(
                                 "w-full py-3 px-4 border-2 border-dashed border-gray-300 rounded-lg text-gray-600 hover:border-emerald-400 hover:text-emerald-600 transition-colors",
-                                importing && "opacity-50 cursor-not-allowed"
+                                importUnavailable && "opacity-50 cursor-not-allowed"
                             )}
                         >
                             {importing ? "导入中..." : "点击选择 CSV 文件导入车辆数据"}
                         </button>
                         <p className="text-xs text-gray-400">
-                            支持的列：车牌号、车架号(VIN)、发动机号、品牌型号、车辆类型、车主姓名、车主电话、车主身份证等
+                            请先下载样表并按样表列名准备文件；支持列：车牌号、车架号(VIN)、发动机号、品牌型号、车辆类型、车主姓名、车主电话、车主身份证等
                         </p>
                     </div>
 
@@ -159,10 +236,10 @@ const CRMExportImport: React.FC<CRMExportImportProps> = ({
                         <h3 className="text-sm font-bold text-gray-700">🧪 测试数据</h3>
                         <button
                             onClick={handleImportTestVehicles}
-                            disabled={importing}
+                            disabled={importUnavailable}
                             className={cn(
                                 "w-full py-2 px-4 bg-amber-50 text-amber-600 rounded-lg hover:bg-amber-100 transition-colors text-sm font-medium",
-                                importing && "opacity-50 cursor-not-allowed"
+                                importUnavailable && "opacity-50 cursor-not-allowed"
                             )}
                         >
                             一键导入测试数据 (Mock Data)
@@ -183,6 +260,13 @@ const CRMExportImport: React.FC<CRMExportImportProps> = ({
                             )}
                         >
                             {importResult.message}
+                            {!!importResult.diagnostics?.length && (
+                                <div className="mt-2 border-t border-current/20 pt-2 text-xs leading-relaxed opacity-90">
+                                    {importResult.diagnostics.map((item, index) => (
+                                        <div key={`${item}-${index}`}>{item}</div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>

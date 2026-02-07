@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { ApiRequestError, fetchJsonWithFallback } from "../utils/apiClient";
 
 // 状态显示文案映射
 const STATUS_TEXT_MAP: Record<string, string> = {
@@ -41,8 +42,19 @@ interface SearchResult {
   owner?: any;
 }
 
+const formatApiError = (error: unknown, fallback: string): string => {
+  if (error instanceof ApiRequestError) {
+    if (error.kind === "network" || error.kind === "timeout") {
+      return `接口异常：${error.message}`;
+    }
+    return error.message || fallback;
+  }
+  return error instanceof Error ? error.message : fallback;
+};
+
 export default function Status() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [mode, setMode] = useState<"status" | "search">("status");
 
   // 状态视图 state
@@ -58,7 +70,7 @@ export default function Status() {
   const [searchError, setSearchError] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
 
-  const applicationId = sessionStorage.getItem("applicationId");
+  const applicationId = searchParams.get("id") || searchParams.get("proposalId");
 
   useEffect(() => {
     // 如果没有 applicationId，自动切换到搜索模式
@@ -73,15 +85,13 @@ export default function Status() {
     // 核心轮询逻辑：只读取 status
     const queryStatus = async () => {
       try {
-        const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
-        const res = await fetch(`${API_BASE_URL}/api/proposal/status?id=${applicationId}`, {
+        const data = await fetchJsonWithFallback<{ status: string; reason?: string }>(
+          `/api/proposal/status?id=${encodeURIComponent(applicationId)}`,
+          {
           method: "GET",
           headers: { "Content-Type": "application/json" },
-        });
-
-        if (!res.ok) throw new Error("查询失败");
-
-        const data = await res.json();
+          }
+        );
 
         setStatus(data.status);
         setReason(data.reason || "");
@@ -91,8 +101,8 @@ export default function Status() {
         if (data.status === "PAID" || data.status === "ISSUED" || data.status === "REJECTED") {
           clearInterval(timer);
         }
-      } catch (e: any) {
-        setError(e.message || "接口异常");
+      } catch (error) {
+        setError(formatApiError(error, "接口异常"));
         setLoading(false);
         clearInterval(timer);
       }
@@ -123,8 +133,7 @@ export default function Status() {
     setHasSearched(true);
 
     try {
-      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
-      const response = await fetch(`${API_BASE_URL}/api/application/search`, {
+      const results = await fetchJsonWithFallback<SearchResult[]>("/api/application/search", {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -136,18 +145,13 @@ export default function Status() {
         }),
       });
 
-      if (!response.ok) {
-        throw new Error(`搜索失败: ${response.status}`);
-      }
-
-      const results = await response.json();
       setSearchResults(Array.isArray(results) ? results : []);
 
       if (results.length === 0) {
         setSearchError('未找到匹配的投保记录');
       }
-    } catch (err) {
-      setSearchError(err instanceof Error ? err.message : '搜索出错');
+    } catch (error) {
+      setSearchError(formatApiError(error, "搜索出错"));
       setSearchResults([]);
     } finally {
       setSearchLoading(false);
