@@ -2,7 +2,10 @@ name = "chinalife-xinhexin-s"
 compatibility_date = "2024-05-01"
 pages_build_output_dir = "dist"
 
-# 这是纯前端项目，不使用 Cloudflare Workers Functions
+# Pages Functions + Workers Service Binding
+services = [
+  { binding = "XINHEXIN_API", service = "xinhexin-api" }
+]
 
 # 全局 KV 绑定 - 对所有环境生效
 kv_namespaces = [
