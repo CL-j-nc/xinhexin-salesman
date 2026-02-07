@@ -17,3 +17,8 @@ kv_namespaces = [
 kv_namespaces = [
   { binding = "KV_BINDING", id = "893ca20cf01c42d894ec2977f73710df" }
 ]
+
+# production 环境的服务绑定
+services = [
+  { binding = "XINHEXIN_API", service = "xinhexin-api" }
+]
