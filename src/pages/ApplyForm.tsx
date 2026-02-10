@@ -537,10 +537,12 @@ const ApplyForm: React.FC = () => {
       };
 
       // 调用 API 保存到 KV（核保端需要读取这个数据）
+      // Use text/plain to avoid Preflight OPTIONS check (Simple Request)
+      // Backend automatically parses JSON body regardless of Content-Type
       const result = await fetchJsonWithFallback<{ proposalId: string }>("/api/policy.salesman", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(applicationData),
+        headers: { "Content-Type": "text/plain" }
       });
 
       // 提交成功后跳转状态页

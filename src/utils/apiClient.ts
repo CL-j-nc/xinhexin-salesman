@@ -93,6 +93,11 @@ const withTimeout = async (url: string, init: RequestInit, timeoutMs: number): P
 
     try {
         const finalInit: RequestInit = {
+            // Simple Request Strategy:
+            // We use text/plain and POST to avoid Preflight.
+            // But we NEED cookies for Cloudflare Access.
+            // So we MUST use "include".
+            credentials: init.credentials ?? "include",
             ...init,
             signal: controller.signal,
         };
