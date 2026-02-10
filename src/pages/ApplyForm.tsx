@@ -547,10 +547,9 @@ const ApplyForm: React.FC = () => {
       navigate(`/status?id=${encodeURIComponent(result.proposalId)}`);
     } catch (error) {
       if (error instanceof ApiRequestError) {
-        const prefix = error.kind === "network" || error.kind === "timeout"
-          ? "服务连接失败"
-          : "提交失败";
-        alert(`${prefix}：${error.message}`);
+        // Debugging Info
+        const buildTime = "2026-02-10 21:40";
+        alert(`【调试信息】提交异常\n类型: ${error.kind}\nURL: ${error.url}\n错误: ${error.message}\n时间: ${buildTime}`);
       } else {
         alert(error instanceof Error ? error.message : "提交失败，请重试");
       }
