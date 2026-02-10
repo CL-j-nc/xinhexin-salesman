@@ -56,11 +56,7 @@ const getPrimaryApiBase = (): string => {
     // 开发环境优先走本地 API（允许自定义 envBase）
     if (import.meta.env.DEV) return envBase || "http://localhost:8787";
 
-    // 生产环境优先同域，避免跨域 + Access 预检失败
-    if (typeof window !== "undefined" && window.location?.origin) {
-        return window.location.origin;
-    }
-
+    // 生产环境：始终使用 Workers API 地址，不走 Pages 同域
     return envBase || FALLBACK_API_BASE;
 };
 
