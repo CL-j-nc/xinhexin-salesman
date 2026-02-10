@@ -93,7 +93,6 @@ const withTimeout = async (url: string, init: RequestInit, timeoutMs: number): P
 
     try {
         const finalInit: RequestInit = {
-            credentials: init.credentials ?? "include",
             ...init,
             signal: controller.signal,
         };
