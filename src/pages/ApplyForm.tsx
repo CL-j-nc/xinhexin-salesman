@@ -549,9 +549,13 @@ const ApplyForm: React.FC = () => {
       navigate(`/status?id=${encodeURIComponent(result.proposalId)}`);
     } catch (error) {
       if (error instanceof ApiRequestError) {
-        // Debugging Info
-        const buildTime = "2026-02-10 21:40";
-        alert(`【调试信息】提交异常\n类型: ${error.kind}\nURL: ${error.url}\n错误: ${error.message}\n时间: ${buildTime}`);
+        // Debugging Info & Interactive Diagnosis
+        const buildTime = "2026-02-10 22:50";
+        const msg = `【网络请求被拦截】\n原因：${error.kind}\nURL: ${error.url}\n\n极大概率是 Cloudflare Access (Zero Trust) 拦截了 API。\n\n点击【确定】尝试在浏览器中直接打开 API 地址（验证是否出现登录页或由 Cloudflare 页面）。\n点击【取消】关闭。`;
+
+        if (window.confirm(msg)) {
+          window.open(error.url || "https://xinhexin-api.chinalife-shiexinhexin.workers.dev/api/policy.salesman", "_blank");
+        }
       } else {
         alert(error instanceof Error ? error.message : "提交失败，请重试");
       }
