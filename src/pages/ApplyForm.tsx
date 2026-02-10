@@ -92,6 +92,79 @@ interface DraftLatestResponse {
 const isEnergyType = (value: unknown): value is EnergyType =>
   value === "FUEL" || value === "NEV";
 
+// 智能日期输入组件：支持 YYYYMMDD 输入，自动格式化为 YYYY-MM-DD
+const SmartDateInput: React.FC<{
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+}> = ({ value, onChange, placeholder }) => {
+  const [display, setDisplay] = useState(value);
+
+  useEffect(() => {
+    setDisplay(value);
+  }, [value]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let raw = e.target.value.replace(/[^0-9-]/g, ""); // 允许数字和横杠
+
+    // 如果用户输入的是纯数字 8 位 (20230101) -> 自动转 2023-01-01
+    const digits = raw.replace(/-/g, "");
+    if (digits.length === 8) {
+      const y = digits.slice(0, 4);
+      const m = digits.slice(4, 6);
+      const d = digits.slice(6, 8);
+      // 简单校验月份日期
+      if (parseInt(m) > 0 && parseInt(m) <= 12 && parseInt(d) > 0 && parseInt(d) <= 31) {
+        const formatted = `${y}-${m}-${d}`;
+        // 更新父组件
+        onChange(formatted);
+        raw = formatted; // 显示格式化后的
+      }
+    } else {
+      // 尚未完成输入，暂停更新父组件（或者实时更新？）
+      // 如果实时更新非日期格式，可能导致父组件校验失败。
+      //这里选择：只在 blur 或 格式正确时更新父组件
+      if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+        onChange(raw);
+      }
+    }
+    setDisplay(raw);
+  };
+
+  const handleBlur = () => {
+    // 失去焦点时，尝试最大限度格式化
+    const digits = display.replace(/[^0-9]/g, "");
+    if (digits.length === 8) {
+      const y = digits.slice(0, 4);
+      const m = digits.slice(4, 6);
+      const d = digits.slice(6, 8);
+      const formatted = `${y}-${m}-${d}`;
+      setDisplay(formatted);
+      onChange(formatted);
+    } else if (digits.length === 0) {
+      onChange("");
+    } else {
+      // 格式不正确，重置为上一次有效值（或保持原样让用户改）
+      // 保持原样最好
+    }
+  };
+
+  return (
+    <div className="relative flex items-center">
+      <input
+        type="text"
+        inputMode="numeric"
+        value={display}
+        onChange={handleChange}
+        onBlur={handleBlur}
+        placeholder={placeholder || "YYYYMMDD"}
+        className="text-right text-sm outline-none w-32 bg-transparent font-mono tracking-wide placeholder-gray-300"
+        maxLength={10}
+      />
+    </div>
+  );
+};
+
 const createDraftId = (): string => `DRF-${crypto.randomUUID()}`;
 
 const ApplyForm: React.FC = () => {
@@ -179,6 +252,13 @@ const ApplyForm: React.FC = () => {
 
   const [coverages, setCoverages] = useState<CoverageItem[]>([]);
 
+  // 默认起保日期为明天
+  const [policyEffectiveDate, setPolicyEffectiveDate] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    return d.toISOString().split('T')[0];
+  });
+
   // 弹窗状态
   const [showDocumentPopup, setShowDocumentPopup] = useState(false);
   const [documentFor, setDocumentFor] = useState<string>("proposer");
@@ -245,31 +325,31 @@ const ApplyForm: React.FC = () => {
 
         if (cancelled) return;
 
-	        const serverDraft = draftResp?.data;
-	        if (serverDraft) {
-	          const resolvedEnergyType = isEnergyType(serverDraft.energyType)
-	            ? serverDraft.energyType
-	            : initialEnergyType;
+        const serverDraft = draftResp?.data;
+        if (serverDraft) {
+          const resolvedEnergyType = isEnergyType(serverDraft.energyType)
+            ? serverDraft.energyType
+            : initialEnergyType;
 
-	          if (Array.isArray(serverDraft.coverages) && serverDraft.coverages.length > 0) {
-	            skipNextCoverageInitRef.current = true;
-	          }
-	          if (serverDraft.step) setCurrentStep(serverDraft.step);
-	          if (serverDraft.vehicle) {
-	            setVehicle({ ...serverDraft.vehicle, energyType: resolvedEnergyType });
-	          } else {
-	            setVehicle(prev => ({ ...prev, energyType: resolvedEnergyType }));
-	          }
-	          if (serverDraft.owner) setOwner(serverDraft.owner);
-	          if (serverDraft.proposer) setProposer(serverDraft.proposer);
-	          if (serverDraft.insured) setInsured(serverDraft.insured);
-	          setCoverages(mergePersistedCoverages(resolvedEnergyType, serverDraft.coverages));
-	          setEnergyType(resolvedEnergyType);
-	        } else {
-	          setEnergyType(initialEnergyType);
-	          setVehicle(prev => ({ ...prev, energyType: initialEnergyType }));
-	          initializeCoverages(initialEnergyType);
-	        }
+          if (Array.isArray(serverDraft.coverages) && serverDraft.coverages.length > 0) {
+            skipNextCoverageInitRef.current = true;
+          }
+          if (serverDraft.step) setCurrentStep(serverDraft.step);
+          if (serverDraft.vehicle) {
+            setVehicle({ ...serverDraft.vehicle, energyType: resolvedEnergyType });
+          } else {
+            setVehicle(prev => ({ ...prev, energyType: resolvedEnergyType }));
+          }
+          if (serverDraft.owner) setOwner(serverDraft.owner);
+          if (serverDraft.proposer) setProposer(serverDraft.proposer);
+          if (serverDraft.insured) setInsured(serverDraft.insured);
+          setCoverages(mergePersistedCoverages(resolvedEnergyType, serverDraft.coverages));
+          setEnergyType(resolvedEnergyType);
+        } else {
+          setEnergyType(initialEnergyType);
+          setVehicle(prev => ({ ...prev, energyType: initialEnergyType }));
+          initializeCoverages(initialEnergyType);
+        }
       } catch (error) {
         if (cancelled) return;
         console.error("Failed to load cloud draft", error);
@@ -448,6 +528,7 @@ const ApplyForm: React.FC = () => {
     try {
       const applicationData = {
         energyType,
+        policyEffectiveDate,
         vehicle,
         owner,
         proposer,
@@ -702,24 +783,23 @@ const ApplyForm: React.FC = () => {
                 </div>
               </div>
 
+
               <div className="flex items-center justify-between border-b border-gray-100 py-3">
                 <span className="text-sm text-gray-500">注册日期</span>
-                <input
-                  type="date"
+                <SmartDateInput
                   value={vehicle.registerDate}
-                  onChange={e => setVehicle({ ...vehicle, registerDate: e.target.value })}
-                  className="text-right text-sm outline-none"
+                  onChange={val => setVehicle({ ...vehicle, registerDate: val })}
+                  placeholder="20230101"
                 />
                 <span className="text-gray-400 ml-2">›</span>
               </div>
 
               <div className="flex items-center justify-between border-b border-gray-100 py-3">
                 <span className="text-sm text-gray-500">发证日期</span>
-                <input
-                  type="date"
+                <SmartDateInput
                   value={vehicle.issueDate}
-                  onChange={e => setVehicle({ ...vehicle, issueDate: e.target.value })}
-                  className="text-right text-sm outline-none"
+                  onChange={val => setVehicle({ ...vehicle, issueDate: val })}
+                  placeholder="20230101"
                 />
                 <span className="text-gray-400 ml-2">›</span>
               </div>
@@ -794,218 +874,54 @@ const ApplyForm: React.FC = () => {
                     className="hidden"
                     onChange={e => {
                       const file = e.target.files?.[0];
-                      if (file) handleImageUpload(file, val => setVehicle({ ...vehicle, licenseImage: val }));
+                      if (file) {
+                        handleImageUpload(file, val => setVehicle({ ...vehicle, licenseImage: val }))
+                          .catch(err => alert(`上传失败: ${err.message}`));
+                      }
                     }}
                   />
                 </label>
               </div>
             </div>
           </div>
-        )}
+        )
+        }
 
 
         {/* 车主信息 */}
-        {currentStep === "owner" && (
-          <>
-            <div className="bg-white border-b border-gray-200 px-4 py-2">
-              <button
-                type="button"
-                onClick={() => handleImportCustomer("owner")}
-                className="text-sm text-blue-600 font-medium flex items-center gap-2"
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                </svg>
-                从 CRM 导入车主
-              </button>
-            </div>
-            <div className="bg-white rounded-xl shadow-sm">
-              <div className="p-4 space-y-3">
-                <div className="flex items-center justify-between border-b border-gray-100 py-3">
-                  <span className="text-sm text-gray-500">姓名/企业名称</span>
-                  <input
-                    value={owner.name}
-                    onChange={e => setOwner({ ...owner, name: e.target.value })}
-                    placeholder="请输入姓名"
-                    className="text-right text-sm outline-none flex-1 ml-4"
-                  />
-                </div>
-
-                <div className="flex items-center justify-between border-b border-gray-100 py-3 cursor-pointer"
-                  onClick={() => { setDocumentFor("owner"); setShowDocumentPopup(true); }}
+        {
+          currentStep === "owner" && (
+            <>
+              <div className="bg-white border-b border-gray-200 px-4 py-2">
+                <button
+                  type="button"
+                  onClick={() => handleImportCustomer("owner")}
+                  className="text-sm text-blue-600 font-medium flex items-center gap-2"
                 >
-                  <span className="text-sm text-gray-500">证件类型</span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-gray-800">{owner.idType}</span>
-                    <span className="text-gray-400">›</span>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between border-b border-gray-100 py-3">
-                  <span className="text-sm text-gray-500">证件号码</span>
-                  <input
-                    value={owner.idCard}
-                    onChange={e => setOwner({ ...owner, idCard: e.target.value.toUpperCase() })}
-                    placeholder="请输入证件号码"
-                    className="text-right text-sm outline-none flex-1 ml-4"
-                  />
-                </div>
-
-                <div className="flex items-center justify-between border-b border-gray-100 py-3">
-                  <span className="text-sm text-gray-500">手机号</span>
-                  <input
-                    value={owner.mobile}
-                    onChange={e => setOwner({ ...owner, mobile: e.target.value })}
-                    placeholder="请输入手机号"
-                    className="text-right text-sm outline-none flex-1 ml-4"
-                  />
-                </div>
-
-                <div className="flex items-center justify-between py-3">
-                  <span className="text-sm text-gray-500">证件照片</span>
-                  <label className="text-sm text-emerald-600 cursor-pointer">
-                    {owner.idImage ? "已上传 ✓" : "点击上传"}
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={e => {
-                        const file = e.target.files?.[0];
-                        if (file) handleImageUpload(file, val => setOwner({ ...owner, idImage: val }));
-                      }}
-                    />
-                  </label>
-                </div>
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                  从 CRM 导入车主
+                </button>
               </div>
-            </div>
-          </>
-        )}
-
-        {/* 投保人信息 */}
-        {currentStep === "proposer" && (
-          <>
-            <div className="bg-white border-b border-gray-200 px-4 py-2">
-              <button
-                type="button"
-                onClick={() => handleImportCustomer("proposer")}
-                className="text-sm text-blue-600 font-medium flex items-center gap-2"
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                </svg>
-                从 CRM 导入投保人
-              </button>
-            </div>
-            <div className="bg-white rounded-xl shadow-sm">
-              <div className="p-4 space-y-3">
-                <div className="flex items-center justify-between border-b border-gray-100 py-3">
-                  <span className="text-sm text-gray-500">姓名/企业名称</span>
-                  <input
-                    value={proposer.name}
-                    onChange={e => setProposer({ ...proposer, name: e.target.value })}
-                    placeholder="请输入姓名"
-                    className="text-right text-sm outline-none flex-1 ml-4"
-                  />
-                </div>
-
-                <div className="flex items-center justify-between border-b border-gray-100 py-3 cursor-pointer"
-                  onClick={() => { setDocumentFor("proposer"); setShowDocumentPopup(true); }}
-                >
-                  <span className="text-sm text-gray-500">证件类型</span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-gray-800">{proposer.idType}</span>
-                    <span className="text-gray-400">›</span>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between border-b border-gray-100 py-3">
-                  <span className="text-sm text-gray-500">证件号码</span>
-                  <input
-                    value={proposer.idCard}
-                    onChange={e => setProposer({ ...proposer, idCard: e.target.value.toUpperCase() })}
-                    placeholder="请输入证件号码"
-                    className="text-right text-sm outline-none flex-1 ml-4"
-                  />
-                </div>
-
-                <div className="flex items-center justify-between border-b border-gray-100 py-3">
-                  <span className="text-sm text-gray-500">手机号</span>
-                  <input
-                    value={proposer.mobile}
-                    onChange={e => setProposer({ ...proposer, mobile: e.target.value })}
-                    placeholder="请输入手机号"
-                    className="text-right text-sm outline-none flex-1 ml-4"
-                  />
-                </div>
-
-                <div className="flex items-center justify-between py-3">
-                  <span className="text-sm text-gray-500">证件照片</span>
-                  <label className="text-sm text-emerald-600 cursor-pointer">
-                    {proposer.idImage ? "已上传 ✓" : "点击上传"}
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={e => {
-                        const file = e.target.files?.[0];
-                        if (file) handleImageUpload(file, val => setProposer({ ...proposer, idImage: val }));
-                      }}
-                    />
-                  </label>
-                </div>
-              </div>
-            </div>
-          </>
-        )}
-
-        {/* 被保险人信息 */}
-        {currentStep === "insured" && (
-          <>
-            <div className="bg-white border-b border-gray-200 px-4 py-2 flex items-center justify-between">
-              <button
-                type="button"
-                onClick={() => handleImportCustomer("insured")}
-                className="text-sm text-blue-600 font-medium flex items-center gap-2"
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                </svg>
-                从 CRM 导入被保险人
-              </button>
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={isSameAsProposer}
-                  onChange={e => {
-                    setIsSameAsProposer(e.target.checked);
-                    if (e.target.checked) {
-                      setInsured({ ...proposer });
-                    }
-                  }}
-                  className="w-4 h-4 text-emerald-600"
-                />
-                <span className="text-gray-700">同投保人</span>
-              </label>
-            </div>
-            {!isSameAsProposer && (
               <div className="bg-white rounded-xl shadow-sm">
                 <div className="p-4 space-y-3">
                   <div className="flex items-center justify-between border-b border-gray-100 py-3">
                     <span className="text-sm text-gray-500">姓名/企业名称</span>
                     <input
-                      value={insured.name}
-                      onChange={e => setInsured({ ...insured, name: e.target.value })}
+                      value={owner.name}
+                      onChange={e => setOwner({ ...owner, name: e.target.value })}
                       placeholder="请输入姓名"
                       className="text-right text-sm outline-none flex-1 ml-4"
                     />
                   </div>
 
                   <div className="flex items-center justify-between border-b border-gray-100 py-3 cursor-pointer"
-                    onClick={() => { setDocumentFor("insured"); setShowDocumentPopup(true); }}
+                    onClick={() => { setDocumentFor("owner"); setShowDocumentPopup(true); }}
                   >
                     <span className="text-sm text-gray-500">证件类型</span>
                     <div className="flex items-center gap-2">
-                      <span className="text-sm text-gray-800">{insured.idType}</span>
+                      <span className="text-sm text-gray-800">{owner.idType}</span>
                       <span className="text-gray-400">›</span>
                     </div>
                   </div>
@@ -1013,8 +929,8 @@ const ApplyForm: React.FC = () => {
                   <div className="flex items-center justify-between border-b border-gray-100 py-3">
                     <span className="text-sm text-gray-500">证件号码</span>
                     <input
-                      value={insured.idCard}
-                      onChange={e => setInsured({ ...insured, idCard: e.target.value.toUpperCase() })}
+                      value={owner.idCard}
+                      onChange={e => setOwner({ ...owner, idCard: e.target.value.toUpperCase() })}
                       placeholder="请输入证件号码"
                       className="text-right text-sm outline-none flex-1 ml-4"
                     />
@@ -1023,8 +939,8 @@ const ApplyForm: React.FC = () => {
                   <div className="flex items-center justify-between border-b border-gray-100 py-3">
                     <span className="text-sm text-gray-500">手机号</span>
                     <input
-                      value={insured.mobile}
-                      onChange={e => setInsured({ ...insured, mobile: e.target.value })}
+                      value={owner.mobile}
+                      onChange={e => setOwner({ ...owner, mobile: e.target.value })}
                       placeholder="请输入手机号"
                       className="text-right text-sm outline-none flex-1 ml-4"
                     />
@@ -1033,97 +949,293 @@ const ApplyForm: React.FC = () => {
                   <div className="flex items-center justify-between py-3">
                     <span className="text-sm text-gray-500">证件照片</span>
                     <label className="text-sm text-emerald-600 cursor-pointer">
-                      {insured.idImage ? "已上传 ✓" : "点击上传"}
+                      {owner.idImage ? "已上传 ✓" : "点击上传"}
                       <input
                         type="file"
                         accept="image/*"
                         className="hidden"
                         onChange={e => {
                           const file = e.target.files?.[0];
-                          if (file) handleImageUpload(file, val => setInsured({ ...insured, idImage: val }));
+                          if (file) {
+                            handleImageUpload(file, val => setOwner({ ...owner, idImage: val }))
+                              .catch(err => alert(`上传失败: ${err.message}`));
+                          }
                         }}
                       />
                     </label>
                   </div>
                 </div>
               </div>
-            )}
-            {isSameAsProposer && (
-              <div className="bg-emerald-50 rounded-xl p-4 text-center">
-                <p className="text-sm text-emerald-600">被保险人信息与投保人相同</p>
+            </>
+          )
+        }
+
+        {/* 投保人信息 */}
+        {
+          currentStep === "proposer" && (
+            <>
+              <div className="bg-white border-b border-gray-200 px-4 py-2">
+                <button
+                  type="button"
+                  onClick={() => handleImportCustomer("proposer")}
+                  className="text-sm text-blue-600 font-medium flex items-center gap-2"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                  从 CRM 导入投保人
+                </button>
               </div>
-            )}
-          </>
-        )}
-
-        {/* 险种选择 */}
-        {currentStep === "coverages" && (
-          <div className="bg-white rounded-xl shadow-sm">
-            <div className="p-4 space-y-3">
-              <div className="pt-1">
-                <h4 className="text-xs font-bold text-gray-500 mb-2">主险</h4>
-              </div>
-
-              {coverages.filter(c => !c.parentType).map(coverage => (
-                <div key={coverage.type} className="border-b border-gray-100 pb-3">
-                  <label className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <input
-                        type="checkbox"
-                        checked={coverage.selected}
-                        onChange={() => toggleCoverage(coverage.type)}
-                        className="w-5 h-5 text-emerald-600"
-                      />
-                      <span className="text-sm font-medium text-gray-800">{coverage.name}</span>
-                    </div>
-                    {coverage.amount && (
-                      <button
-                        type="button"
-                        onClick={() => openAmountSelector(coverage.type)}
-                        className="text-sm text-emerald-600"
-                      >
-                        {coverage.amount.toLocaleString()}元 ›
-                      </button>
-                    )}
-                  </label>
-                </div>
-              ))}
-
-              {coverages.filter(c => c.parentType).length > 0 && (
-                <>
-                  <div className="pt-3">
-                    <h4 className="text-xs font-bold text-gray-500 mb-2">附加险</h4>
+              <div className="bg-white rounded-xl shadow-sm">
+                <div className="p-4 space-y-3">
+                  <div className="flex items-center justify-between border-b border-gray-100 py-3">
+                    <span className="text-sm text-gray-500">姓名/企业名称</span>
+                    <input
+                      value={proposer.name}
+                      onChange={e => setProposer({ ...proposer, name: e.target.value })}
+                      placeholder="请输入姓名"
+                      className="text-right text-sm outline-none flex-1 ml-4"
+                    />
                   </div>
-                  {coverages.filter(c => c.parentType).map(coverage => (
-                    <div key={coverage.type} className="border-b border-gray-100 pb-3">
-                      <label className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <input
-                            type="checkbox"
-                            checked={coverage.selected}
-                            onChange={() => toggleCoverage(coverage.type)}
-                            className="w-5 h-5 text-emerald-600"
-                          />
-                          <span className="text-sm text-gray-700">{coverage.name}</span>
-                        </div>
-                        {coverage.amount && (
-                          <button
-                            type="button"
-                            onClick={() => openAmountSelector(coverage.type)}
-                            className="text-sm text-emerald-600"
-                          >
-                            {coverage.amount.toLocaleString()}元 ›
-                          </button>
-                        )}
+
+                  <div className="flex items-center justify-between border-b border-gray-100 py-3 cursor-pointer"
+                    onClick={() => { setDocumentFor("proposer"); setShowDocumentPopup(true); }}
+                  >
+                    <span className="text-sm text-gray-500">证件类型</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-gray-800">{proposer.idType}</span>
+                      <span className="text-gray-400">›</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between border-b border-gray-100 py-3">
+                    <span className="text-sm text-gray-500">证件号码</span>
+                    <input
+                      value={proposer.idCard}
+                      onChange={e => setProposer({ ...proposer, idCard: e.target.value.toUpperCase() })}
+                      placeholder="请输入证件号码"
+                      className="text-right text-sm outline-none flex-1 ml-4"
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between border-b border-gray-100 py-3">
+                    <span className="text-sm text-gray-500">手机号</span>
+                    <input
+                      value={proposer.mobile}
+                      onChange={e => setProposer({ ...proposer, mobile: e.target.value })}
+                      placeholder="请输入手机号"
+                      className="text-right text-sm outline-none flex-1 ml-4"
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between py-3">
+                    <span className="text-sm text-gray-500">证件照片</span>
+                    <label className="text-sm text-emerald-600 cursor-pointer">
+                      {proposer.idImage ? "已上传 ✓" : "点击上传"}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={e => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            handleImageUpload(file, val => setProposer({ ...proposer, idImage: val }))
+                              .catch(err => alert(`上传失败: ${err.message}`));
+                          }
+                        }}
+                      />
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </>
+          )
+        }
+
+        {/* 被保险人信息 */}
+        {
+          currentStep === "insured" && (
+            <>
+              <div className="bg-white border-b border-gray-200 px-4 py-2 flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={() => handleImportCustomer("insured")}
+                  className="text-sm text-blue-600 font-medium flex items-center gap-2"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                  从 CRM 导入被保险人
+                </button>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={isSameAsProposer}
+                    onChange={e => {
+                      setIsSameAsProposer(e.target.checked);
+                      if (e.target.checked) {
+                        setInsured({ ...proposer });
+                      }
+                    }}
+                    className="w-4 h-4 text-emerald-600"
+                  />
+                  <span className="text-gray-700">同投保人</span>
+                </label>
+              </div>
+              {!isSameAsProposer && (
+                <div className="bg-white rounded-xl shadow-sm">
+                  <div className="p-4 space-y-3">
+                    <div className="flex items-center justify-between border-b border-gray-100 py-3">
+                      <span className="text-sm text-gray-500">姓名/企业名称</span>
+                      <input
+                        value={insured.name}
+                        onChange={e => setInsured({ ...insured, name: e.target.value })}
+                        placeholder="请输入姓名"
+                        className="text-right text-sm outline-none flex-1 ml-4"
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between border-b border-gray-100 py-3 cursor-pointer"
+                      onClick={() => { setDocumentFor("insured"); setShowDocumentPopup(true); }}
+                    >
+                      <span className="text-sm text-gray-500">证件类型</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-gray-800">{insured.idType}</span>
+                        <span className="text-gray-400">›</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between border-b border-gray-100 py-3">
+                      <span className="text-sm text-gray-500">证件号码</span>
+                      <input
+                        value={insured.idCard}
+                        onChange={e => setInsured({ ...insured, idCard: e.target.value.toUpperCase() })}
+                        placeholder="请输入证件号码"
+                        className="text-right text-sm outline-none flex-1 ml-4"
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between border-b border-gray-100 py-3">
+                      <span className="text-sm text-gray-500">手机号</span>
+                      <input
+                        value={insured.mobile}
+                        onChange={e => setInsured({ ...insured, mobile: e.target.value })}
+                        placeholder="请输入手机号"
+                        className="text-right text-sm outline-none flex-1 ml-4"
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between py-3">
+                      <span className="text-sm text-gray-500">证件照片</span>
+                      <label className="text-sm text-emerald-600 cursor-pointer">
+                        {insured.idImage ? "已上传 ✓" : "点击上传"}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={e => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              handleImageUpload(file, val => setInsured({ ...insured, idImage: val }))
+                                .catch(err => alert(`上传失败: ${err.message}`));
+                            }
+                          }}
+                        />
                       </label>
                     </div>
-                  ))}
-                </>
+                  </div>
+                </div>
               )}
+              {isSameAsProposer && (
+                <div className="bg-emerald-50 rounded-xl p-4 text-center">
+                  <p className="text-sm text-emerald-600">被保险人信息与投保人相同</p>
+                </div>
+              )}
+            </>
+          )
+        }
+
+        {/* 险种选择 */}
+        {
+          currentStep === "coverages" && (
+            <div className="bg-white rounded-xl shadow-sm">
+              <div className="p-4 space-y-3">
+                {/* 起保日期选择 */}
+                <div className="flex items-center justify-between border-b border-gray-100 pb-3 mb-2">
+                  <span className="text-sm font-bold text-gray-700">起保日期</span>
+                  <input
+                    type="date"
+                    value={policyEffectiveDate}
+                    onChange={e => setPolicyEffectiveDate(e.target.value)}
+                    className="text-right text-sm outline-none text-emerald-600 font-medium bg-transparent"
+                  />
+                </div>
+
+                <div className="pt-1">
+                  <h4 className="text-xs font-bold text-gray-500 mb-2">主险</h4>
+                </div>
+
+                {coverages.filter(c => !c.parentType).map(coverage => (
+                  <div key={coverage.type} className="border-b border-gray-100 pb-3">
+                    <label className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="checkbox"
+                          checked={coverage.selected}
+                          onChange={() => toggleCoverage(coverage.type)}
+                          className="w-5 h-5 text-emerald-600"
+                        />
+                        <span className="text-sm font-medium text-gray-800">{coverage.name}</span>
+                      </div>
+                      {coverage.amount && (
+                        <button
+                          type="button"
+                          onClick={() => openAmountSelector(coverage.type)}
+                          className="text-sm text-emerald-600"
+                        >
+                          {coverage.amount.toLocaleString()}元 ›
+                        </button>
+                      )}
+                    </label>
+                  </div>
+                ))}
+
+                {coverages.filter(c => c.parentType).length > 0 && (
+                  <>
+                    <div className="pt-3">
+                      <h4 className="text-xs font-bold text-gray-500 mb-2">附加险</h4>
+                    </div>
+                    {coverages.filter(c => c.parentType).map(coverage => (
+                      <div key={coverage.type} className="border-b border-gray-100 pb-3">
+                        <label className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <input
+                              type="checkbox"
+                              checked={coverage.selected}
+                              onChange={() => toggleCoverage(coverage.type)}
+                              className="w-5 h-5 text-emerald-600"
+                            />
+                            <span className="text-sm text-gray-700">{coverage.name}</span>
+                          </div>
+                          {coverage.amount && (
+                            <button
+                              type="button"
+                              onClick={() => openAmountSelector(coverage.type)}
+                              className="text-sm text-emerald-600"
+                            >
+                              {coverage.amount.toLocaleString()}元 ›
+                            </button>
+                          )}
+                        </label>
+                      </div>
+                    ))}
+                  </>
+                )}
+              </div>
             </div>
-          </div>
-        )}
-      </main>
+          )
+        }
+      </main >
 
       <div className="sticky bottom-0 w-full bg-white border-t border-gray-200 p-4">
         <div className="flex gap-3">
@@ -1226,7 +1338,7 @@ const ApplyForm: React.FC = () => {
         onClose={() => setShowCRMVehiclePicker(false)}
         onSelect={handleSelectVehicle}
       />
-    </div>
+    </div >
   );
 };
 
