@@ -420,7 +420,7 @@ export default function Status() {
                   <div className="font-bold text-emerald-800">请客户扫描下方二维码进行认证签名</div>
                   <div className="bg-white p-3 rounded-lg shadow-sm">
                     <QRCodeSVG
-                      value={`https://chinalife-shie-xinhexin.pages.dev/#/confirm?id=${applicationId}`}
+                      value={`https://chinalife-shie-xinhexin.pages.dev/#/buffer?id=${applicationId}`}
                       size={200}
                       fgColor="#059669"
                     />
