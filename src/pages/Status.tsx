@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { ApiRequestError, fetchJsonWithFallback } from "../utils/apiClient";
+import { QRCodeSVG } from "qrcode.react";
 
 // 状态显示文案映射
 const STATUS_TEXT_MAP: Record<string, string> = {
@@ -60,6 +61,8 @@ export default function Status() {
   // 状态视图 state
   const [status, setStatus] = useState<string | null>(null);
   const [reason, setReason] = useState<string>("");
+  const [paymentLink, setPaymentLink] = useState<string | null>(null);
+  const [authCode, setAuthCode] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -85,16 +88,18 @@ export default function Status() {
     // 核心轮询逻辑：只读取 status
     const queryStatus = async () => {
       try {
-        const data = await fetchJsonWithFallback<{ status: string; reason?: string }>(
+        const data = await fetchJsonWithFallback<{ status: string; reason?: string; paymentLink?: string; authCode?: string }>(
           `/api/proposal/status?id=${encodeURIComponent(applicationId)}`,
           {
-          method: "GET",
-          headers: { "Content-Type": "application/json" },
+            method: "GET",
+            headers: { "Content-Type": "application/json" },
           }
         );
 
         setStatus(data.status);
         setReason(data.reason || "");
+        setPaymentLink(data.paymentLink || null);
+        setAuthCode(data.authCode || null);
         setLoading(false);
 
         // 终态停止轮询
@@ -409,13 +414,28 @@ export default function Status() {
             {/* 按钮区域 */}
             <div className="mt-8 space-y-3">
               {/* 核保通过后显示支付按钮 */}
+              {/* 核保通过后显示客户认证二维码 */}
               {status === "UA" && (
-                <button
-                  onClick={() => alert("跳转支付页面（待对接）")}
-                  className="w-full py-3 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white font-bold rounded-xl shadow-lg hover:shadow-xl transition-all"
-                >
-                  前往支付
-                </button>
+                <div className="flex flex-col items-center space-y-4 p-4 border-2 border-dashed border-emerald-200 rounded-xl bg-emerald-50">
+                  <div className="font-bold text-emerald-800">请客户扫描下方二维码进行认证签名</div>
+                  <div className="bg-white p-3 rounded-lg shadow-sm">
+                    <QRCodeSVG
+                      value={`https://chinalife-shie-xinhexin.pages.dev/#/confirm?id=${applicationId}`}
+                      size={200}
+                      fgColor="#059669"
+                    />
+                  </div>
+                  {authCode && (
+                    <div className="bg-white border-2 border-emerald-400 rounded-xl p-4 w-full text-center">
+                      <div className="text-xs text-slate-500 mb-1">客户认证验证码</div>
+                      <div className="text-3xl font-mono font-black text-emerald-700 tracking-[0.3em]">{authCode}</div>
+                      <div className="text-xs text-slate-400 mt-1">请告知客户在认证页面输入此验证码</div>
+                    </div>
+                  )}
+                  <p className="text-xs text-slate-500 text-center px-4">
+                    投保人需在手机端输入手机号及上方验证码完成身份验证，然后阅读条款、电子签名，最后完成支付。
+                  </p>
+                </div>
               )}
 
               {/* 退回修改后显示重新提交按钮 */}
@@ -465,8 +485,8 @@ export default function Status() {
             <button
               onClick={() => setMode("status")}
               className={`px-6 py-2 rounded-md text-sm font-semibold transition-colors ${mode === "status"
-                  ? "bg-white text-emerald-600 shadow"
-                  : "text-slate-600 hover:text-slate-800"
+                ? "bg-white text-emerald-600 shadow"
+                : "text-slate-600 hover:text-slate-800"
                 }`}
             >
               当前进度
@@ -474,8 +494,8 @@ export default function Status() {
             <button
               onClick={() => setMode("search")}
               className={`px-6 py-2 rounded-md text-sm font-semibold transition-colors ${mode === "search"
-                  ? "bg-white text-emerald-600 shadow"
-                  : "text-slate-600 hover:text-slate-800"
+                ? "bg-white text-emerald-600 shadow"
+                : "text-slate-600 hover:text-slate-800"
                 }`}
             >
               多条件查询
