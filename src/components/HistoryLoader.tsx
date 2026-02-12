@@ -32,6 +32,7 @@ interface ApplicationData {
   insured: any;
   coverages: any[];
   status?: string;
+  qrUrl?: string; // Add this field
 }
 
 interface HistoryLoaderProps {
@@ -110,8 +111,8 @@ const HistoryLoader: React.FC<HistoryLoaderProps> = ({
       const res = await fetchJsonWithFallback<{ data?: any; status?: string }>(
         `/api/application/detail?id=${encodeURIComponent(id)}`,
         {
-        method: "GET",
-        headers: { "Content-Type": "application/json" },
+          method: "GET",
+          headers: { "Content-Type": "application/json" },
         }
       );
       const data = res.data;
@@ -336,8 +337,32 @@ const HistoryLoader: React.FC<HistoryLoaderProps> = ({
                       </div>
                     </div>
 
-                    {/* 选中标识 */}
-                    {selectedId === item.id && (
+                    {/* QR Code / Action Section */}
+                    {['UA', 'APPROVED', 'UNDERWRITING_CONFIRMED', 'PAID', 'ISSUED'].includes(item.status) && item.qrUrl && (
+                      <div className="flex flex-col items-center justify-center pl-4 border-l border-gray-100 ml-2">
+                        {/* Only show if selected to keep list clean, or maybe small icon? */}
+                        {/* Let's show a small QR icon if not selected, and full QR if selected */}
+                        {selectedId === item.id ? (
+                          <div className="bg-white p-1 rounded border border-gray-200 shadow-sm">
+                            <iframe
+                              src={`https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(item.qrUrl)}`}
+                              className="w-20 h-20"
+                              style={{ border: 'none' }}
+                              title="QR Code"
+                            />
+                            <div className="text-[10px] text-center text-gray-500 mt-1">认证码</div>
+                          </div>
+                        ) : (
+                          <div className="text-gray-400 text-xs flex flex-col items-center">
+                            <span className="text-xl">📱</span>
+                            <span>认证</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* 选中标识 (Keep existing if no QR shown, or overlay) */}
+                    {selectedId === item.id && !item.qrUrl && (
                       <div className="ml-4">
                         <div className="w-6 h-6 bg-emerald-500 rounded-full flex items-center justify-center">
                           <svg
