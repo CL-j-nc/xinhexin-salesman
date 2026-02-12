@@ -674,8 +674,8 @@ const ApplyForm: React.FC = () => {
     <div className={cn(
       "min-h-screen pb-24",
       isNEV
-        ? "bg-gradient-to-t from-emerald-100 via-emerald-50 to-white"  // 新能源：人寿绿渐变至白 (Stronger)
-        : "bg-gray-50"  // 燃油车：保持不变
+        ? "bg-gradient-to-br from-emerald-50 via-teal-100 to-teal-200"  // 新能源：更深的青绿渐变
+        : "bg-gray-50"
     )}>
       <Header
         title="新核心车险承保信息页面"
