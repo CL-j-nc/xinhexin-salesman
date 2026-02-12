@@ -52,6 +52,7 @@ interface VehicleInfo {
   seats: string;
   energyType: EnergyType;
   licenseImage: string;
+  batteryCapacity?: string; // 电池包容量 (NEV Only)
 }
 
 interface CoverageItem {
@@ -195,6 +196,7 @@ const ApplyForm: React.FC = () => {
     seats: "",
     energyType: "FUEL",
     licenseImage: "",
+    batteryCapacity: "",
   });
 
   const [owner, setOwner] = useState<PersonInfo>({
@@ -846,6 +848,20 @@ const ApplyForm: React.FC = () => {
                 />
               </div>
 
+              {/* NEV Specific Field: Battery Capacity */}
+              {isNEV && (
+                <div className="flex items-center justify-between border-b border-gray-100 py-3">
+                  <span className="text-sm text-gray-500">电池包容量 (kWh)</span>
+                  <input
+                    value={vehicle.batteryCapacity || ""}
+                    onChange={e => setVehicle({ ...vehicle, batteryCapacity: e.target.value })}
+                    placeholder="请输入电池包容量"
+                    type="number"
+                    className="text-right text-sm outline-none flex-1 ml-4"
+                  />
+                </div>
+              )}
+
               <div className="flex items-center justify-between border-b border-gray-100 py-3">
                 <span className="text-sm text-gray-500">车架号</span>
                 <input
@@ -857,11 +873,11 @@ const ApplyForm: React.FC = () => {
               </div>
 
               <div className="flex items-center justify-between border-b border-gray-100 py-3">
-                <span className="text-sm text-gray-500">发动机号</span>
+                <span className="text-sm text-gray-500">发动机号/电动机号</span>
                 <input
                   value={vehicle.engineNo}
                   onChange={e => setVehicle({ ...vehicle, engineNo: e.target.value.toUpperCase() })}
-                  placeholder="请输入发动机号"
+                  placeholder={isNEV ? "请输入电动机号" : "请输入发动机号"}
                   className="text-right text-sm outline-none flex-1 ml-4"
                 />
               </div>
