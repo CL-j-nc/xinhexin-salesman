@@ -171,7 +171,10 @@ const createDraftId = (): string => `DRF-${crypto.randomUUID()}`;
 const ApplyForm: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [energyType, setEnergyType] = useState<EnergyType>("FUEL");
+  const [energyType, setEnergyType] = useState<EnergyType>(() => {
+    const type = searchParams.get("energyType");
+    return isEnergyType(type) ? type : "FUEL";
+  });
   const [currentStep, setCurrentStep] = useState<Step>("vehicle");
   const [isSameAsProposer, setIsSameAsProposer] = useState(false);
   const [submitting, setSubmitting] = useState(false);
