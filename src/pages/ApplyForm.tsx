@@ -331,6 +331,31 @@ const ApplyForm: React.FC = () => {
             ? serverDraft.energyType
             : initialEnergyType;
 
+          // CONFLICT RESOLUTION:
+          // If the user explicitly requested an energy type in the URL (e.g. ?energyType=NEV),
+          // but the auto-loaded "latest" draft is of a DIFFERENT type (e.g. FUEL),
+          // we must prioritization the User's Intent over the stale draft.
+          // We discard the stale draft and start fresh to avoid UI mismatch (e.g. showing "Motor Vehicle" titles in NEV mode).
+          if (!queryDraftId && queryEnergyType && resolvedEnergyType !== initialEnergyType) {
+            console.log("Draft type mismatch. Requested:", initialEnergyType, "Draft:", resolvedEnergyType, "-> Discarding draft.");
+
+            // Generate new ID
+            const newDraftId = createDraftId();
+            setDraftId(newDraftId);
+
+            // Update URL to new ID
+            const newParams = new URLSearchParams(searchParamString);
+            newParams.set("draftId", newDraftId);
+            newParams.set("energyType", initialEnergyType);
+            setSearchParams(newParams, { replace: true });
+
+            // Initialize fresh state
+            setEnergyType(initialEnergyType);
+            setVehicle(prev => ({ ...prev, energyType: initialEnergyType }));
+            initializeCoverages(initialEnergyType);
+            return;
+          }
+
           if (Array.isArray(serverDraft.coverages) && serverDraft.coverages.length > 0) {
             skipNextCoverageInitRef.current = true;
           }
@@ -647,7 +672,7 @@ const ApplyForm: React.FC = () => {
     <div className={cn(
       "min-h-screen pb-24",
       isNEV
-        ? "bg-gradient-to-t from-emerald-500/30 via-emerald-500/10 to-transparent"  // 新能源：从下到上渐变（人寿绿→透明）
+        ? "bg-gradient-to-t from-[#00c37b]/15 via-[#00c37b]/5 to-white"  // 新能源：人寿绿渐变至白
         : "bg-gray-50"  // 燃油车：保持不变
     )}>
       <Header
