@@ -778,17 +778,9 @@ const ApplyForm: React.FC = () => {
                     onChange={e => {
                       const prefix = vehicle.plate ? vehicle.plate.substring(0, 1) : "苏";
                       const suffix = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "");
-                      const newPlate = prefix + suffix;
-                      setVehicle({ ...vehicle, plate: newPlate });
+                      setVehicle({ ...vehicle, plate: prefix + suffix });
 
-                      // Auto-detect NEV based on plate length (Green plates: usually 8 chars)
-                      if (newPlate.length === 8 && energyType !== "NEV") {
-                        setEnergyType("NEV");
-                        setVehicle(prev => ({ ...prev, plate: newPlate, energyType: "NEV" }));
-                      } else if (newPlate.length === 7 && energyType !== "FUEL") {
-                        // Optional: Auto-switch back to Fuel if shorter? Maybe confusing.
-                        // Keeping it manual or only switch to NEV on 8.
-                      }
+
                     }}
                     placeholder="请输入号码"
                     className="text-right text-sm font-bold text-gray-800 outline-none w-24 uppercase placeholder-gray-300"
@@ -808,55 +800,6 @@ const ApplyForm: React.FC = () => {
                   <option value="特种车">特种车</option>
                 </select>
                 <span className="text-gray-400 ml-2">›</span>
-              </div>
-
-              {/* Energy Type Selector */}
-              <div className="flex items-center justify-between border-b border-gray-100 py-3">
-                <span className="text-sm text-gray-500">能源类型</span>
-                <div className="flex items-center gap-4">
-                  <label
-                    className={cn(
-                      "flex items-center gap-2 px-3 py-1.5 rounded-full border text-sm font-medium transition-colors cursor-pointer",
-                      energyType === "FUEL"
-                        ? "border-emerald-500 bg-emerald-50 text-emerald-700"
-                        : "border-gray-200 text-gray-500 hover:bg-gray-50"
-                    )}
-                  >
-                    <input
-                      type="radio"
-                      name="energyType"
-                      value="FUEL"
-                      checked={energyType === "FUEL"}
-                      onChange={() => {
-                        setEnergyType("FUEL");
-                        setVehicle({ ...vehicle, energyType: "FUEL" });
-                      }}
-                      className="hidden"
-                    />
-                    燃油汽车
-                  </label>
-                  <label
-                    className={cn(
-                      "flex items-center gap-2 px-3 py-1.5 rounded-full border text-sm font-medium transition-colors cursor-pointer",
-                      energyType === "NEV"
-                        ? "border-emerald-500 bg-emerald-50 text-emerald-700 shadow-sm shadow-emerald-100"
-                        : "border-gray-200 text-gray-500 hover:bg-gray-50"
-                    )}
-                  >
-                    <input
-                      type="radio"
-                      name="energyType"
-                      value="NEV"
-                      checked={energyType === "NEV"}
-                      onChange={() => {
-                        setEnergyType("NEV");
-                        setVehicle({ ...vehicle, energyType: "NEV" });
-                      }}
-                      className="hidden"
-                    />
-                    新能源
-                  </label>
-                </div>
               </div>
 
               <div
