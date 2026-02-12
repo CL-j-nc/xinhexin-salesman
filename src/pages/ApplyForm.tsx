@@ -677,7 +677,7 @@ const ApplyForm: React.FC = () => {
     <div className={cn(
       "min-h-screen pb-24",
       isNEV
-        ? "bg-gradient-to-br from-emerald-50 via-teal-100 to-teal-200"  // 新能源：更深的青绿渐变
+        ? "bg-gradient-to-br from-emerald-50 via-emerald-100 to-emerald-200"  // 新能源：国寿绿（中间色调）
         : "bg-gray-50"
     )}>
       <Header
