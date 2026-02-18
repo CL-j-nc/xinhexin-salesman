@@ -10,7 +10,7 @@ import UseNatureSelector from "../components/UseNatureSelector";
 import CRMCustomerPicker from "../components/CRMCustomerPicker";
 import CRMVehiclePicker from "../components/CRMVehiclePicker";
 import type { CRMCustomer, CRMVehicle } from "../utils/crmStorage";
-import { getApplicableCoverages, getCoverageName } from "../utils/coverageConfig";
+import { getApplicableCoverages, getCoverageName, getCoverageConfig } from "../utils/coverageConfig";
 import { ApiRequestError, fetchJsonWithFallback } from "../utils/apiClient";
 
 type Step = "vehicle" | "owner" | "proposer" | "insured" | "coverages";
@@ -563,7 +563,7 @@ const ApplyForm: React.FC = () => {
         owner,
         proposer,
         insured,
-        coverages: coverages.filter(c => c.selected),
+        coverages: coverages.filter(c => c.selected).map(c => ({ ...getCoverageConfig(c.type), ...c })),
       };
 
       // 调用 API 保存到 KV（核保端需要读取这个数据）
